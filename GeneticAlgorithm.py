@@ -1,13 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
-P_pcs_time = np.array([[139, 729, 382, 382, 468, 814],  ## Stückzahl der Produkte
-                      [79,113, 78, 113, 46, 113],  ## Produktionszeit auf Band 1
-                      [43, 61, 42, 61,12,75], ## Produktionszeit auf Band 2
-                      [141,159,141,159,62,141], ## Produktionszeit auf Band 3
-                      [145,160,145,160,80,100]])  ## Produktionszeit auf Band 4)
+# P_pcs_time = np.array([[139, 729, 382, 382, 468, 814],  ## Stückzahl der Produkte
+#                       [79,113, 78, 113, 46, 113],  ## Produktionszeit auf Band 1
+#                       [43, 61, 42, 61,12,75], ## Produktionszeit auf Band 2
+#                       [141,159,141,159,62,141], ## Produktionszeit auf Band 3
+#                       [145,160,145,160,80,100]])  ## Produktionszeit auf Band 4)
 
-def fitness_calc2(P):
+P_pcs_time = np.array([ [1,2,3,3], ## Stückzahl der Produkte
+                        [2,1,3,1], ## Produktionszeit auf Band 1
+                        [5,1,2,1]])## Produktionszeit auf Band 2
+
+def fitness_calc(P):
     """
     Calculate the total time for products to pass through all bands.
 
@@ -62,9 +67,8 @@ def generate_individuum(P_pcs_time):
 def single_point_crossover_1D(A, B, p):
     if p <= 0:
         p = np.random.randint(1,A.size)
-    x = np.random.randint(0, p)
-    child1 = np.concatenate((A[:x], B[x:]))
-    child2 = np.concatenate((B[:x], A[x:]))
+    child1 = np.concatenate((A[:p], B[p:]))
+    child2 = np.concatenate((B[:p], A[p:]))
     return child1, child2
 
 def order_to_time(product_order):
@@ -93,8 +97,11 @@ def mutate(individuum, mutation_rate):
     return individuum
 
 if __name__ == "__main__":
-    generation_count = 100  # Anzahl der Generationen
-    pop_count = 50          # Anzahl der Individuuen pro Population
+    summe = 0
+    start = time.time()
+
+    generation_count = 10  # Anzahl der Generationen
+    pop_count = 1000          # Anzahl der Individuuen pro Population
     mutation_rate = 0.3     # Wahrscheinlichkeit für eine Mutation
     mutation_count = 5      # Anzahl der Mutationselemente
 
@@ -111,13 +118,22 @@ if __name__ == "__main__":
     ax.grid(True)
     line, = ax.plot([])     # Leerer Plot, der später aktualisiert wird
 
+    """Greedy Verfahren"""
+    sorted_P_pcs_time = np.argsort(P_pcs_time[1])
+    sorted_M = P_pcs_time[:, sorted_P_pcs_time]
+    # Extracting the repetition counts from the first row
+    repetition_counts_first_row = sorted_M[0]
+    greedy_order = [value for value, count in zip(sorted_P_pcs_time, repetition_counts_first_row) for _ in range(count)]
+    print(f"Fitness mit Greedy Verfahren: {fitness_calc(order_to_time(greedy_order))}")
+    """**************************"""
+
+    """Startpopulation bilden"""
     for i in range(pop_count):
         ind_time, ind_order = generate_individuum(P_pcs_time)
-        pop_fitness[i] = fitness_calc2(ind_time)
+        pop_fitness[i] = fitness_calc(ind_time)
         pop_order[i] = ind_order
 
     for generation in range(generation_count):
-        print(f"Generation: # {generation}")
         # Sortieren aller Fitnesswerte dieser Population mit der Reihenfolge
         sorted_keys = sorted(pop_fitness, key=pop_fitness.get)
         sorted_pop_order = {key: pop_order[key] for key in sorted_keys}
@@ -136,7 +152,7 @@ if __name__ == "__main__":
 
         for i in range(len(top_individuals_dict)):
             pop_order[i] = top_individuals_dict[i]
-            current_fitness = fitness_calc2(order_to_time(top_individuals_dict[i]))
+            current_fitness = fitness_calc(order_to_time(top_individuals_dict[i]))
             pop_fitness[i] = current_fitness
             all_fit_values.append(current_fitness)      # Füge den aktuellen Fitnesswert direkt hinzu
             all_fit_values.sort(reverse=True)           # Sortieren der Liste - absteigend
@@ -146,6 +162,11 @@ if __name__ == "__main__":
         ax.relim()  # Grenzen neu berechnen
         ax.autoscale_view()  # Skaliert die Achse
         plt.draw()  # Zeichnet den aktualisierten Plot
-        plt.pause(0.1)
+        plt.pause(0.01)
+    print(f"Fitness mit Genetischen Algorithmen: {all_fit_values[-1]}")
+    """Greedy Verfahren"""
+
     plt.ioff()
+    ende = time.time()
+    print('{:5.3f}s'.format(ende - start))
     plt.show()
