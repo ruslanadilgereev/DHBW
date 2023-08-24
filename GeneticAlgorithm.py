@@ -164,7 +164,6 @@ if __name__ == "__main__":
         plt.draw()  # Zeichnet den aktualisierten Plot
         plt.pause(0.01)
     print(f"Fitness mit Genetischen Algorithmen: {all_fit_values[-1]}")
-    """Greedy Verfahren"""
 
     plt.ioff()
     ende = time.time()
