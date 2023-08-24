@@ -137,7 +137,7 @@ if __name__ == "__main__":
         # Sortieren aller Fitnesswerte dieser Population mit der Reihenfolge
         sorted_keys = sorted(pop_fitness, key = pop_fitness.get) # type: ignore
         sorted_pop_order = {key: pop_order[key] for key in sorted_keys}
-        top_individuals = [sorted_pop_order[key] for key in sorted_keys[:int(pop_count * top_individuals_ratio))]]
+        top_individuals = [sorted_pop_order[key] for key in sorted_keys[:int(pop_count * top_individuals_ratio)]]
         top_individuals_dict = {i: indiv for i, indiv in enumerate(top_individuals)}
 
         k = len(top_individuals_dict)
