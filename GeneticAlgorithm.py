@@ -8,6 +8,7 @@ import time
 #                       [141,159,141,159,62,141], ## Produktionszeit auf Band 3
 #                       [145,160,145,160,80,100]])  ## Produktionszeit auf Band 4)
 
+
 P_pcs_time = np.array([ [1,2,3,3], ## Stückzahl der Produkte
                         [2,1,3,1], ## Produktionszeit auf Band 1
                         [5,1,2,1]])## Produktionszeit auf Band 2
@@ -67,8 +68,8 @@ def generate_individuum(P_pcs_time):
 def single_point_crossover_1D(A, B, p):
     if p <= 0:
         p = np.random.randint(1,A.size)
-    child1 = np.concatenate((A[:p], B[p:]))
-    child2 = np.concatenate((B[:p], A[p:]))
+    child1 = A##np.concatenate((A[:p], B[p:]))
+    child2 = B##np.concatenate((B[:p], A[p:]))
     return child1, child2
 
 def order_to_time(product_order):
@@ -99,13 +100,13 @@ def mutate(individuum, mutation_rate):
 if __name__ == "__main__":
     summe = 0
     start = time.time()
-
-    generation_count = 10  # Anzahl der Generationen
-    pop_count = 1000          # Anzahl der Individuuen pro Population
-    mutation_rate = 0.3     # Wahrscheinlichkeit für eine Mutation (zwischen 0 und 1)
+    generation_count = 100  # Anzahl der Generationen
+    pop_count = 100          # Anzahl der Individuuen pro Population
+    mutation_rate = 1     # Wahrscheinlichkeit für eine Mutation (zwischen 0 und 1)
     mutation_count = 5      # Anzahl der Mutationselemente
     top_individuals_ratio = 0.2  # Anteil der besten Individuen, die in die nächste Generation übernommen werden in % (zwischen 0 und 1)
     all_fit_values = []     # Liste, um die Fitnesswerte aller Individuen über alle Generationen zu speichern
+    all_order_values = []   # Liste, um die Reihenfolge aller Individuen über alle Generationen zu speichern
     pop_order = {}
     pop_fitness = {}
 
@@ -114,7 +115,7 @@ if __name__ == "__main__":
     # Anpassungen an der X- und Y-Achse, Titel, Legende usw.
     ax.set_xlabel('Individuum Nummer')
     ax.set_ylabel('Fitness')
-    ax.set_title('Fitness über die Generationen')
+    ax.set_title('Fitness über die Individuuen')
     ax.grid(True)
     line, = ax.plot([])     # Leerer Plot, der später aktualisiert wird
 
@@ -124,7 +125,7 @@ if __name__ == "__main__":
     # Extracting the repetition counts from the first row
     repetition_counts_first_row = sorted_M[0]
     greedy_order = [value for value, count in zip(sorted_P_pcs_time, repetition_counts_first_row) for _ in range(count)]
-    print(f"Fitness mit Greedy Verfahren: {fitness_calc(order_to_time(greedy_order))}")
+    print(f"Fitness mit Greedy Verfahren: {fitness_calc(order_to_time(greedy_order))}: {greedy_order}")
     """**************************"""
 
     """Startpopulation bilden"""
@@ -154,17 +155,18 @@ if __name__ == "__main__":
             pop_order[i] = top_individuals_dict[i]
             current_fitness = fitness_calc(order_to_time(top_individuals_dict[i]))
             pop_fitness[i] = current_fitness
-            all_fit_values.append(current_fitness)      # Füge den aktuellen Fitnesswert direkt hinzu
-            all_fit_values.sort(reverse=True)           # Sortieren der Liste - absteigend
-            line.set_xdata(range(len(all_fit_values)))  # X-Daten aktualisieren
-            line.set_ydata(all_fit_values)              # Y-Daten aktualisieren
+            all_fit_values.append((current_fitness, pop_order[i]))   # Add the current fitness value directly
+            all_fit_values.sort(key=lambda x: x[0], reverse=True)   
+            x_data = range(len(all_fit_values))                      # X-data for the plot
+            y_data = [value[0] for value in all_fit_values]          # Extract the fitness values for Y-data
+            line.set_xdata(x_data)                                   # Update X-data
+            line.set_ydata(y_data)              # Y-Daten aktualisieren
 
         ax.relim()  # Grenzen neu berechnen
         ax.autoscale_view()  # Skaliert die Achse
         plt.draw()  # Zeichnet den aktualisierten Plot
         plt.pause(0.01)
     print(f"Fitness mit Genetischen Algorithmen: {all_fit_values[-1]}")
-
     plt.ioff()
     ende = time.time()
     print('{:5.3f}s'.format(ende - start))
