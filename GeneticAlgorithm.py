@@ -102,9 +102,9 @@ if __name__ == "__main__":
 
     generation_count = 10  # Anzahl der Generationen
     pop_count = 1000          # Anzahl der Individuuen pro Population
-    mutation_rate = 0.3     # Wahrscheinlichkeit für eine Mutation
+    mutation_rate = 0.3     # Wahrscheinlichkeit für eine Mutation (zwischen 0 und 1)
     mutation_count = 5      # Anzahl der Mutationselemente
-
+    top_individuals_ratio = 0.2  # Anteil der besten Individuen, die in die nächste Generation übernommen werden in % (zwischen 0 und 1)
     all_fit_values = []     # Liste, um die Fitnesswerte aller Individuen über alle Generationen zu speichern
     pop_order = {}
     pop_fitness = {}
@@ -135,9 +135,9 @@ if __name__ == "__main__":
 
     for generation in range(generation_count):
         # Sortieren aller Fitnesswerte dieser Population mit der Reihenfolge
-        sorted_keys = sorted(pop_fitness, key=pop_fitness.get)
+        sorted_keys = sorted(pop_fitness, key = pop_fitness.get) # type: ignore
         sorted_pop_order = {key: pop_order[key] for key in sorted_keys}
-        top_individuals = [sorted_pop_order[key] for key in sorted_keys[:pop_count // 2]]
+        top_individuals = [sorted_pop_order[key] for key in sorted_keys[:int(pop_count * top_individuals_ratio))]]
         top_individuals_dict = {i: indiv for i, indiv in enumerate(top_individuals)}
 
         k = len(top_individuals_dict)
