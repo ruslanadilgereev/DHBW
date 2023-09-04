@@ -64,7 +64,7 @@ def generate_individuum(P_pcs_time):
 
     return shuffled_array, shuffled_product_order
 
-
+## Nicht anwendbar, da die Stückzahl bei der Crossover Methode nicht beachtet wird.
 def single_point_crossover_1D(A, B, p):
     if p <= 0:
         p = np.random.randint(1,A.size)
