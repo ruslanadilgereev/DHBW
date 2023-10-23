@@ -24,21 +24,22 @@ def fitness_calc(P):
     - Total time for all products to pass through the last band.
     """
 
-    num_bands, num_products = P.shape
-    t = np.zeros((num_bands, num_products))
+    num_bands, num_products = P.shape  # Number of bands and products
+    t = np.zeros((num_bands, num_products))  # Initialize the time matrix
 
     # For the first band
-    t[0, 0] = P[0, 0]
-    for j in range(1, num_products):
+    t[0, 0] = P[0, 0]  # The first element is the same as the first element of P
+    for j in range(1, num_products):  # The first row is the cumulative sum of the first row of P
         t[0, j] = t[0, j - 1] + P[0, j]
 
     # For the subsequent bands
-    for i in range(1, num_bands):
-        t[i, 0] = t[i - 1, 0] + P[i, 0]
-        for j in range(1, num_products):
+    for i in range(1, num_bands):  # For each row
+        t[i, 0] = t[i - 1, 0] + P[i, 0]  # The first element is the sum of the first element of the previous row
+                                         # and the first element of P
+        for j in range(1, num_products):  # For each column
             t[i, j] = max(t[i - 1, j], t[i, j - 1]) + P[i, j]
 
-    return t[num_bands - 1, num_products - 1]
+    return t[num_bands - 1, num_products - 1]  # Return the last element of the time matrix
 
 
 def generate_individuum(P_pcs_time):
@@ -65,11 +66,11 @@ def generate_individuum(P_pcs_time):
     return shuffled_array, shuffled_product_order
 
 ## Nicht anwendbar, da die Stückzahl bei der Crossover Methode nicht beachtet wird.
-def single_point_crossover_1D(A, B, p):
+def single_point_crossover_1D(A, B, p):  # A, B: 1D numpy arrays
     if p <= 0:
         p = np.random.randint(1,A.size)
-    child1 = A##np.concatenate((A[:p], B[p:]))
-    child2 = B##np.concatenate((B[:p], A[p:]))
+    child1 = A  # np.concatenate((A[:p], B[p:]))
+    child2 = B  # np.concatenate((B[:p], A[p:]))
     return child1, child2
 
 def order_to_time(product_order):
@@ -100,7 +101,7 @@ def mutate(individuum, mutation_rate):
 if __name__ == "__main__":
     summe = 0
     start = time.time()
-    generation_count = 100  # Anzahl der Generationen
+    generation_count = 1000  # Anzahl der Generationen
     pop_count = 100          # Anzahl der Individuuen pro Population
     mutation_rate = 1     # Wahrscheinlichkeit für eine Mutation (zwischen 0 und 1)
     mutation_count = 5      # Anzahl der Mutationselemente
