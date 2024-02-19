@@ -1,0 +1,147 @@
+C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/17/2024 11:04:28 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE MAIN_AUFGABE1
+OBJECT MODULE PLACED IN .\Objects\main_Aufgabe1.obj
+COMPILER INVOKED BY: C:\DHBW\Mechatronische Systeme in der Anwendung\Software-20240129\C51\BIN\C51.EXE main_Aufgabe1.c O
+                    -PTIMIZE(8,SPEED) BROWSE MODP2 DEBUG OBJECTEXTEND PRINT(.\Listings\main_Aufgabe1.lst) TABS(2) OBJECT(.\Objects\main_Aufga
+                    -be1.obj)
+
+line level    source
+
+   1          #include <xc886.h> // XC Board Bibliothek
+   2          #include <DIP204_XC886.c>  // Display Funktionen
+   3          
+   4          // Definition der Pins für den Ultraschall-Sensor
+   5          #define TRIGGER_PIN 2  // P1.2 als Trigger-Pin für den Ultraschall-Sender
+   6          #define ECHO_PIN 5     // P0.5 als Echo-Pin für den Ultraschall-Empfänger
+   7          
+   8          // Variablen für die Entfernungsmessung
+   9          unsigned long distance;    // Entfernung in Zentimetern
+  10          unsigned long TH;          // Zeit in Timer-Ticks
+  11          
+  12          // Initialisierungsfunktion für Hardware und Timer
+  13          void init(void)
+  14          {
+  15   1          lcd_init();              // Initialisiert das LCD
+  16   1          lcd_clr();               // Löscht das LCD
+  17   1      
+  18   1          P0_DIR = 0x00;           // Konfiguriert Port 0 als Eingang 
+  19   1          P1_DIR = 0xFF;           // Konfiguriert Port 1 als Ausgang 
+  20   1          P3_DIR = 0xFF;           // Konfiguriert Port 3 als Ausgang 
+  21   1      
+  22   1          TMOD = 0x11;             // Timer0 und Timer1 als 16-Bit-Zähler initialisiert
+  23   1      
+  24   1          // Timer 1 für die Wartefunktion konfigurieren
+  25   1          TR1 = 1;                 // Startet Timer 1
+  26   1      
+  27   1          // Externer Interrupt für Echo-Pin konfigurieren
+  28   1          EA = 1;                  // Global Interrupt Enable
+  29   1          EX0 = 1;                 // External Interrupt 0 Enable
+  30   1          IT0 = 1;                 // Interrupt 0 auf Edge Triggered einstellen
+  31   1          EXICON0 = 0x00;          // Interrupt auf fallende Flanke einstellen
+  32   1      }
+  33          
+  34          // Wartefunktion, blockiert für 't' Schleifendurchläufe
+  35          void wait(int t)
+  36          {
+  37   1          // Eine Schleife entspricht 10uS -> 0xffff - ( 10us - 0.0833us) ==  0xff87
+  38   1          // Entspricht allerdings laut Messung ca 15us
+  39   1          unsigned int i;
+  40   1          for(i = 0; i < t; i++)
+  41   1          {
+  42   2              TH1 = 0xFF;
+  43   2              TL1 = 0x87;
+  44   2              while(TF1 == 0);
+  45   2              TF1 = 0;
+  46   2          }
+  47   1      }
+  48          
+  49          // Funktion zum Senden eines Trigger-Impulses an den Ultraschall-Sender
+  50          void sendTriggerPulse(void) {
+  51   1          P1_DATA = (1 << TRIGGER_PIN);  // Setzt Trigger-Pin High
+  52   1          wait(1);                       // Kurze Wartezeit
+  53   1          P1_DATA = ~(1 << TRIGGER_PIN); // Setzt Trigger-Pin Low, beendet den Impuls
+C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/17/2024 11:04:28 PAGE 2   
+
+  54   1      }
+  55          
+  56          // Interrupt Service Routine für das Echo-Signal
+  57          void echo_interrupt() interrupt 0 {
+  58   1          TR0 = 0;    // Stoppt Timer 0 bei Echo-Empfang
+  59   1          IRCON0 = 0; // Löscht Interrupt-Anforderung
+  60   1      }
+  61          
+  62          // Funktion zur Ausgabe eines langen Wertes auf dem LCD
+  63          void lcd_long(unsigned long value)
+  64          {
+  65   1          // Zerlegt und gibt den Wert als Zahlenreihe aus
+  66   1          unsigned char i;
+  67   1      
+  68   1          // Teilt den Wert in Zehntausender, Tausender usw. und gibt ihn aus
+  69   1          i = value / 10000; value %= 10000;
+  70   1          if(i != 0) asc_out(i + 0x30);
+  71   1          
+  72   1          i = value / 1000; value %= 1000;
+  73   1          asc_out(i + 0x30);
+  74   1      
+  75   1          i = value / 100; value %= 100;
+  76   1          asc_out(i + 0x30);
+  77   1      
+  78   1          asc_out(0x2C); // Komma
+  79   1      
+  80   1          i = value / 10; value %= 10;
+  81   1          asc_out(i + 0x30);
+  82   1      
+  83   1          value += 0x30;
+  84   1          asc_out((char)value);
+  85   1      }
+  86          
+  87          // Hauptfunktion
+  88          void main(void)
+  89          {
+  90   1          init();  // Initialisiert die Hardware
+  91   1      
+  92   1          while(1)
+  93   1          {
+  94   2              sendTriggerPulse();  // Sendet einen Trigger-Impuls
+  95   2      
+  96   2              // Startet Timer 0 für die Zeitmessung
+  97   2              TH0 = 0;
+  98   2              TL0 = 0;
+  99   2              TR0 = 1;
+ 100   2              TF0 = 0;  // Timer-Overflow-Flag zurücksetzen
+ 101   2      
+ 102   2              // Warten, bis Timer 0 stoppt -> erfolgt im Interrupt
+ 103   2              while(TR0 == 1);
+ 104   2      
+ 105   2              // Berechnet die Entfernung basierend auf Timer-Werten
+ 106   2              TH = (TH0 * 256 + TL0) - 5697; // Korrigiert um Offset
+ 107   2              distance = (TH * 8000) / 55765; // Umrechnung in Zentimeter
+ 108   2      
+ 109   2              // Zeigt die Entfernung auf dem LCD an
+ 110   2              lcd_curs(0); // Setzt Cursor zurück 
+ 111   2              lcd_str("Abstand: ");
+ 112   2              lcd_long(distance);
+ 113   2              lcd_str(" cm");
+ 114   2              lcd_curs(0); // Setzt Cursor zurück       
+ 115   2              wait(50000);  // Wartezeit zwischen den Messungen
+C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/17/2024 11:04:28 PAGE 3   
+
+ 116   2          }
+ 117   1      }
+ 118          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1134    ----
+   CONSTANT SIZE    =     14    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      8      23
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
