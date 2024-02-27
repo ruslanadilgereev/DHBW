@@ -51,8 +51,6 @@ void timer_ueberlauf(void) interrupt 1
 {
 		t0_ueberlauf += 65536;  // Addiert die maximale Z�hlmenge bei einem �berlauf
 
-		TH0 = 0;  // Zur�cksetzen des Timer-High-Byte
-		TL0 = 0;  // Zur�cksetzen des Timer-Low-Byte
 }
 
 
@@ -71,8 +69,8 @@ void init(void)
     EA = 1;                  // Global Interrupt Enable
     EX0 = 1;                 // External Interrupt 0 Enable
 	  ET0 = 1;                 // Interrupt Timer0 Enable
-    IT0 = 1;                 // Interrupt 0 auf Edge Triggered einstellen
-    EXICON0 = 0x00;          // Interrupt auf fallende Flanke einstellen
+    IT0 = 0;                 // Interrupt 0 auf Edge Triggered einstellen
+    //EXICON0 = 0x00;          // Interrupt auf fallende Flanke einstellen
 }
 
 
