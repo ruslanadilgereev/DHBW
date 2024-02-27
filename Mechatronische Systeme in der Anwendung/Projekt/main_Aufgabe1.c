@@ -10,7 +10,7 @@ unsigned long distance;    // Entfernung in Zentimetern
 unsigned long TH;          // Zeit in Timer-Ticks
 
 void init(void);
-void wait(void);
+void wait(int t);
 void sendTriggerPulse(void);
 void lcd_distance(unsigned long value);
 
@@ -33,15 +33,12 @@ void main(void)
         while(TR0 == 1);
 
         // Berechnet die Entfernung basierend auf Timer-Werten
-        TH = (TH0 * 256 + TL0) - 5697; // Korrigiert um Offset
+        TH = (TH0 * 256 + TL0) - 5703; // Korrigiert um Offset
         distance = (TH * 80) / 55765; // Umrechnung in Zentimeter
 
         // Zeigt die Entfernung auf dem LCD an
-				lcd_curs(0); // Setzt Cursor zur�ck 
-        lcd_str("Abstand: ");
         lcd_distance(distance);
-        lcd_str(" cm");
-        lcd_curs(0); // Setzt Cursor zur�ck       
+  			
         wait(50000);  // Wartezeit zwischen den Messungen
     }
 }
@@ -54,7 +51,6 @@ void init(void)
 
     P0_DIR = 0x00;           // Konfiguriert Port 0 als Eingang 
     P1_DIR = 0xFF;           // Konfiguriert Port 1 als Ausgang 
-    P3_DIR = 0xFF;           // Konfiguriert Port 3 als Ausgang 
 
     TMOD = 0x11;             // Timer0 und Timer1 als 16-Bit-Z�hler initialisiert
 
@@ -92,18 +88,34 @@ void echo_interrupt() interrupt 0 {
 // Funktion zur Ausgabe eines langen Wertes auf dem LCD
 void lcd_distance(unsigned long value)
 {
-    // Zerlegt und gibt den Wert als Zahlenreihe aus
-    unsigned char i, j;
-
-    i = value / 100; 
-    value %= 100;
-    if(i != 0) asc_out(i + 0x30);  // Hundertstel
-
-    j = value / 10; 
-    value %= 10;
-    if(j != 0 || (j == 0 && i != 0)) asc_out(j + 0x30);  // Zehner, korrigiert: ausgegeben nur wenn j nicht 0
-
-    lcd_str(" cm");
+    unsigned char i;
+	
+		lcd_curs(0); // Setzt Cursor zur�ck 
+		lcd_clr();
+		lcd_str("Abstand ");
+	
+		if(value > 80)
+		{
+			lcd_str("zu gross!");
+			lcd_curs(20);
+			lcd_str("Mehr als 80 cm");
+		}
+		
+		else if(value < 10)
+		{
+			lcd_str("zu klein!");
+			lcd_curs(20);
+			lcd_str("Kleiner als 10 cm");
+		}
+		else 
+		{
+			i = value / 10; 
+			value %= 10;
+			if(i != 0) asc_out(i + 0x30);  // Hundertstel
+			asc_out(value + 0x30);
+			lcd_str(" cm");
+		}
+		lcd_curs(0); // Setzt Cursor zur�ck 
 }
 
 // Funktion zum Senden eines Trigger-Impulses an den Ultraschall-Sender
