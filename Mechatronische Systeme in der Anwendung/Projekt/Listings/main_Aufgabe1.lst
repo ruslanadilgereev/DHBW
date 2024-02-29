@@ -1,4 +1,4 @@
-C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/27/2024 21:04:50 PAGE 1   
+C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/29/2024 21:52:42 PAGE 1   
 
 
 C51 COMPILER V9.60.0.0, COMPILATION OF MODULE MAIN_AUFGABE1
@@ -21,7 +21,7 @@ line level    source
   10          unsigned long TH;          // Zeit in Timer-Ticks
   11          
   12          void init(void);
-  13          void wait(void);
+  13          void wait(int t);
   14          void sendTriggerPulse(void);
   15          void lcd_distance(unsigned long value);
   16          
@@ -44,91 +44,112 @@ line level    source
   33   2              while(TR0 == 1);
   34   2      
   35   2              // Berechnet die Entfernung basierend auf Timer-Werten
-  36   2              TH = (TH0 * 256 + TL0) - 5697; // Korrigiert um Offset
+  36   2              TH = (TH0 * 256 + TL0) - 5703; // Korrigiert um Offset
   37   2              distance = (TH * 80) / 55765; // Umrechnung in Zentimeter
   38   2      
   39   2              // Zeigt die Entfernung auf dem LCD an
-  40   2              lcd_curs(0); // Setzt Cursor zur�ck 
-  41   2              lcd_str("Abstand: ");
-  42   2              lcd_distance(distance);
-  43   2              lcd_str(" cm");
-  44   2              lcd_curs(0); // Setzt Cursor zur�ck       
-  45   2              wait(50000);  // Wartezeit zwischen den Messungen
-*** ERROR C207 IN LINE 45 OF main_Aufgabe1.c: 'wait': declared with 'void' parameter list
-  46   2          }
-  47   1      }
-  48          
-  49          // Initialisierungsfunktion für Hardware und Timer
-  50          void init(void)
-  51          {
-  52   1          lcd_init();              // Initialisiert das LCD
-C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/27/2024 21:04:50 PAGE 2   
+  40   2              lcd_distance(distance);
+  41   2              
+  42   2              wait(50000);  // Wartezeit zwischen den Messungen
+  43   2          }
+  44   1      }
+  45          
+  46          // Initialisierungsfunktion für Hardware und Timer
+  47          void init(void)
+  48          {
+  49   1          lcd_init();              // Initialisiert das LCD
+  50   1          lcd_clr();               // Löscht das LCD
+  51   1      
+  52   1          P0_DIR = 0x00;           // Konfiguriert Port 0 als Eingang 
+  53   1          P1_DIR = 0xFF;           // Konfiguriert Port 1 als Ausgang 
+C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/29/2024 21:52:42 PAGE 2   
 
-  53   1          lcd_clr();               // Löscht das LCD
   54   1      
-  55   1          P0_DIR = 0x00;           // Konfiguriert Port 0 als Eingang 
-  56   1          P1_DIR = 0xFF;           // Konfiguriert Port 1 als Ausgang 
-  57   1          P3_DIR = 0xFF;           // Konfiguriert Port 3 als Ausgang 
-  58   1      
-  59   1          TMOD = 0x11;             // Timer0 und Timer1 als 16-Bit-Z�hler initialisiert
-  60   1      
-  61   1          // Timer 1 f�r die Wartefunktion konfigurieren
-  62   1          TR1 = 1;                 // Startet Timer 1
-  63   1      
-  64   1          // Externer Interrupt f�r Echo-Pin konfigurieren
-  65   1          EA = 1;                  // Global Interrupt Enable
-  66   1          EX0 = 1;                 // External Interrupt 0 Enable
-  67   1          IT0 = 1;                 // Interrupt 0 auf Edge Triggered einstellen
-  68   1          EXICON0 = 0x00;          // Interrupt auf fallende Flanke einstellen
-  69   1      }
-  70          
-  71          // Wartefunktion, blockiert für 't' Schleifendurchl�ufe
-  72          void wait(int t)
-  73          {
-*** ERROR C236 IN LINE 73 OF main_Aufgabe1.c: 'wait': different length of parameter lists
-  74   1          // Eine Schleife entspricht 10uS -> 0xffff - ( 10us - 0.0833us) ==  0xff87
-  75   1          // Entspricht allerdings laut Messung ca 15us
-  76   1          unsigned int i;
-  77   1          for(i = 0; i < t; i++)
-  78   1          {
-  79   2              TH1 = 0xFF;
-  80   2              TL1 = 0x87;
-  81   2              while(TF1 == 0);
-  82   2              TF1 = 0;
-  83   2          }
-  84   1      }
-  85          
-  86          // Interrupt Service Routine f�r das Echo-Signal
-  87          void echo_interrupt() interrupt 0 {
-  88   1          TR0 = 0;    // Stoppt Timer 0 bei Echo-Empfang
-  89   1          IRCON0 = 0; // L�scht Interrupt-Anforderung
-  90   1      }
-  91          
-  92          // Funktion zur Ausgabe eines langen Wertes auf dem LCD
-  93          void lcd_distance(unsigned long value)
-  94          {
-  95   1          // Zerlegt und gibt den Wert als Zahlenreihe aus
-  96   1          unsigned char i, j;
-  97   1      
-  98   1          i = value / 100; 
-  99   1          value %= 100;
- 100   1          if(i != 0) asc_out(i + 0x30);  // Hundertstel
- 101   1      
- 102   1          j = value / 10; 
- 103   1          value %= 10;
- 104   1          if(j != 0 || (j == 0 && i != 0)) asc_out(j + 0x30);  // Zehner, korrigiert: ausgegeben nur wenn j nich
-             -t 0
- 105   1      
- 106   1          lcd_str(" cm");
- 107   1      }
- 108          
- 109          // Funktion zum Senden eines Trigger-Impulses an den Ultraschall-Sender
- 110          void sendTriggerPulse(void) {
- 111   1          P1_DATA = (1 << TRIGGER_PIN);  // Setzt Trigger-Pin High
- 112   1          wait(1);                       // Kurze Wartezeit
-C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/27/2024 21:04:50 PAGE 3   
+  55   1          TMOD = 0x11;             // Timer0 und Timer1 als 16-Bit-Z�hler initialisiert
+  56   1      
+  57   1          // Timer 1 f�r die Wartefunktion konfigurieren
+  58   1          TR1 = 1;                 // Startet Timer 1
+  59   1      
+  60   1          // Externer Interrupt f�r Echo-Pin konfigurieren
+  61   1          EA = 1;                  // Global Interrupt Enable
+  62   1          EX0 = 1;                 // External Interrupt 0 Enable
+  63   1          IT0 = 1;                 // Interrupt 0 auf Edge Triggered einstellen
+  64   1          EXICON0 = 0x00;          // Interrupt auf fallende Flanke einstellen
+  65   1      }
+  66          
+  67          // Wartefunktion, blockiert für 't' Schleifendurchl�ufe
+  68          void wait(int t)
+  69          {
+  70   1          // Eine Schleife entspricht 10uS -> 0xffff - ( 10us - 0.0833us) ==  0xff87
+  71   1          // Entspricht allerdings laut Messung ca 15us
+  72   1          unsigned int i;
+  73   1          for(i = 0; i < t; i++)
+  74   1          {
+  75   2              TH1 = 0xFF;
+  76   2              TL1 = 0x87;
+  77   2              while(TF1 == 0);
+  78   2              TF1 = 0;
+  79   2          }
+  80   1      }
+  81          
+  82          // Interrupt Service Routine f�r das Echo-Signal
+  83          void echo_interrupt() interrupt 0 {
+  84   1          TR0 = 0;    // Stoppt Timer 0 bei Echo-Empfang
+  85   1          IRCON0 = 0; // L�scht Interrupt-Anforderung
+  86   1      }
+  87          
+  88          // Funktion zur Ausgabe eines langen Wertes auf dem LCD
+  89          void lcd_distance(unsigned long value)
+  90          {
+  91   1          unsigned char i;
+  92   1        
+  93   1          lcd_curs(0); // Setzt Cursor zur�ck 
+  94   1          lcd_clr();
+  95   1          lcd_str("Abstand ");
+  96   1        
+  97   1          if(value > 80)
+  98   1          {
+  99   2            lcd_str("zu gross!");
+ 100   2            lcd_curs(20);
+ 101   2            lcd_str("Mehr als 80 cm");
+ 102   2          }
+ 103   1          
+ 104   1          else if(value < 10)
+ 105   1          {
+ 106   2            lcd_str("zu klein!");
+ 107   2            lcd_curs(20);
+ 108   2            lcd_str("Kleiner als 10 cm");
+ 109   2          }
+ 110   1          else 
+ 111   1          {
+ 112   2            i = value / 10; 
+ 113   2            value %= 10;
+ 114   2            if(i != 0) asc_out(i + 0x30);  // Hundertstel
+ 115   2            asc_out(value + 0x30);
+C51 COMPILER V9.60.0.0   MAIN_AUFGABE1                                                     02/29/2024 21:52:42 PAGE 3   
 
- 113   1          P1_DATA = ~(1 << TRIGGER_PIN); // Setzt Trigger-Pin Low, beendet den Impuls
- 114   1      }
+ 116   2            lcd_str(" cm");
+ 117   2          }
+ 118   1          lcd_curs(0); // Setzt Cursor zur�ck 
+ 119   1      }
+ 120          
+ 121          // Funktion zum Senden eines Trigger-Impulses an den Ultraschall-Sender
+ 122          void sendTriggerPulse(void) {
+ 123   1          P1_DATA = (1 << TRIGGER_PIN);  // Setzt Trigger-Pin High
+ 124   1          wait(1);                       // Kurze Wartezeit
+ 125   1          P1_DATA = ~(1 << TRIGGER_PIN); // Setzt Trigger-Pin Low, beendet den Impuls
+ 126   1      }
 
-C51 COMPILATION COMPLETE.  0 WARNING(S),  2 ERROR(S)
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1042    ----
+   CONSTANT SIZE    =     66    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      8      23
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

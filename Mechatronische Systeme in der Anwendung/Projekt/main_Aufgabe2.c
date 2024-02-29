@@ -50,7 +50,6 @@ void echo_interrupt() interrupt 0
 void timer_ueberlauf(void) interrupt 1 
 {
 		t0_ueberlauf += 65536;  // Addiert die maximale Z�hlmenge bei einem �berlauf
-
 }
 
 
@@ -58,7 +57,7 @@ void timer_ueberlauf(void) interrupt 1
 void init(void)
 {
     lcd_init();              // Initialisiert das LCD
-    lcd_clr();               // L�scht das LCD
+    lcd_clr();               // Löscht das LCD
 
     P0_DIR = 0x00;           // Konfiguriert Port 0 als Eingang 
     P1_DIR = 0xFF;           // Konfiguriert Port 1 als Ausgang 
@@ -68,7 +67,7 @@ void init(void)
 
     EA = 1;                  // Global Interrupt Enable
     EX0 = 1;                 // External Interrupt 0 Enable
-	  ET0 = 1;                 // Interrupt Timer0 Enable
+	ET0 = 1;                 // Interrupt Timer0 Enable
     IT0 = 0;                 // Interrupt 0 auf Edge Triggered einstellen
     //EXICON0 = 0x00;          // Interrupt auf fallende Flanke einstellen
 }
@@ -85,7 +84,7 @@ void calculate_distance(void)
 }
 
 
-// Wartefunktion, blockiert f�r 't' Schleifendurchl�ufe
+// Wartefunktion, blockiert für 't' Schleifendurchl�ufe. Ein Schleifendurchlauf entspricht 15uS.
 void wait(int t)
 {
     unsigned int i;
@@ -102,14 +101,14 @@ void wait(int t)
 // Funktion zum Senden eines Trigger-Impulses an den Ultraschall-Sender
 void sendTriggerPulse(void) 
 {
-		TH0 = 0;  //
-		TL0 = 0;  // Zur
-	
-		P1_DATA = (1 << TRIGGER_PIN);  // Setzt Trigger-Pin High
+	TH0 = 0;  // Timer 0 zurücksetzen
+	TL0 = 0;  // Timer 0 zurücksetzen
+
+	P1_DATA = (1 << TRIGGER_PIN);  // Setzt Trigger-Pin High
     wait(1);                       // Kurze Wartezeit
     P1_DATA = ~(1 << TRIGGER_PIN); // Setzt Trigger-Pin Low, beendet den Impuls
 
-		TR0 = 1;  // Startet Timer 0 f�r die Zeitmessung
+	TR0 = 1;  // Startet Timer 0 f�r die Zeitmessung
 }
 
 

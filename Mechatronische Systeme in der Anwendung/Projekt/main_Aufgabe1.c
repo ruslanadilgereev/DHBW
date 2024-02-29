@@ -27,7 +27,6 @@ void main(void)
         TH0 = 0;
         TL0 = 0;
         TR0 = 1;
-        TF0 = 0;  // Timer-Overflow-Flag zur�cksetzen
 
         // Warten, bis Timer 0 stoppt -> erfolgt im Interrupt
         while(TR0 == 1);
