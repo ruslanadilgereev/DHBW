@@ -377,9 +377,9 @@
           <GroupName>Source Group 1</GroupName>
           <Files>
             <File>
-              <FileName>main_Aufgabe1.c</FileName>
+              <FileName>main_Aufgabe2.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\main_Aufgabe1.c</FilePath>
+              <FilePath>.\main_Aufgabe2.c</FilePath>
             </File>
           </Files>
         </Group>

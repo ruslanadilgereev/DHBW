@@ -1,8 +1,8 @@
-BL51 BANKED LINKER/LOCATER V6.22.2.0                                                    02/29/2024  21:52:43  PAGE 1
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                    03/07/2024  20:22:39  PAGE 1
 
 
 BL51 BANKED LINKER/LOCATER V6.22.2.0, INVOKED BY:
-C:\DHBW\MECHATRONISCHE SYSTEME IN DER ANWENDUNG\SOFTWARE-20240129\C51\BIN\BL51.EXE .\Objects\main_Aufgabe1.obj TO .\Obje
+C:\DHBW\MECHATRONISCHE SYSTEME IN DER ANWENDUNG\SOFTWARE-20240129\C51\BIN\BL51.EXE .\Objects\main_Aufgabe2.obj TO .\Obje
 >> cts\entfernungsmessung PRINT (.\Listings\entfernungsmessung.m51) RAMSIZE (256) CODE (0X0000-0X5FFF, 0XA000-0XBFFF) XD
 >> ATA (0XF000-0XF5FF)
 
@@ -11,7 +11,7 @@ MEMORY MODEL: SMALL
 
 
 INPUT MODULES INCLUDED:
-  .\Objects\main_Aufgabe1.obj (MAIN_AUFGABE1)
+  .\Objects\main_Aufgabe2.obj (MAIN_AUFGABE2)
   C:\DHBW\MECHATRONISCHE SYSTEME IN DER ANWENDUNG\SOFTWARE-20240129\C51\LIB\C51S.LIB (?C_STARTUP)
   C:\DHBW\MECHATRONISCHE SYSTEME IN DER ANWENDUNG\SOFTWARE-20240129\C51\LIB\C51S.LIB (?C?CLDPTR)
   C:\DHBW\MECHATRONISCHE SYSTEME IN DER ANWENDUNG\SOFTWARE-20240129\C51\LIB\C51S.LIB (?C?UIDIV)
@@ -22,7 +22,7 @@ INPUT MODULES INCLUDED:
   C:\DHBW\MECHATRONISCHE SYSTEME IN DER ANWENDUNG\SOFTWARE-20240129\C51\LIB\C51S.LIB (?C?LSHL)
 
 
-LINK MAP OF MODULE:  .\Objects\entfernungsmessung (MAIN_AUFGABE1)
+LINK MAP OF MODULE:  .\Objects\entfernungsmessung (MAIN_AUFGABE2)
 
 
             TYPE    BASE      LENGTH    RELOCATION   SEGMENT NAME
@@ -30,406 +30,432 @@ LINK MAP OF MODULE:  .\Objects\entfernungsmessung (MAIN_AUFGABE1)
 
             * * * * * * *   D A T A   M E M O R Y   * * * * * * *
             REG     0000H     0008H     ABSOLUTE     "REG BANK 0"
-            DATA    0008H     0014H     UNIT         _DATA_GROUP_
-            DATA    001CH     0008H     UNIT         ?DT?MAIN_AUFGABE1
-            DATA    0024H     0002H     UNIT         ?DT?_LCD_INT?MAIN_AUFGABE1
-            DATA    0026H     0001H     UNIT         ?DT?_LCD_BYTE?MAIN_AUFGABE1
-            IDATA   0027H     0001H     UNIT         ?STACK
+            DATA    0008H     0015H     UNIT         _DATA_GROUP_
+            DATA    001DH     0010H     UNIT         ?DT?MAIN_AUFGABE2
+            DATA    002DH     0002H     UNIT         ?DT?_LCD_INT?MAIN_AUFGABE2
+            DATA    002FH     0001H     UNIT         ?DT?_LCD_BYTE?MAIN_AUFGABE2
+            IDATA   0030H     0001H     UNIT         ?STACK
 
             * * * * * * *   C O D E   M E M O R Y   * * * * * * *
             CODE    0000H     0003H     ABSOLUTE     
             CODE    0003H     0003H     ABSOLUTE     
-                    0006H     07FAH                  *** GAP ***
+                    0006H     0005H                  *** GAP ***
+            CODE    000BH     0003H     ABSOLUTE     
+                    000EH     07F2H                  *** GAP ***
             CODE    0800H     01C2H     UNIT         ?C?LIB_CODE
-            CODE    09C2H     00C1H     UNIT         ?PR?_LCD_DISTANCE?MAIN_AUFGABE1
-            CODE    0A83H     00B7H     UNIT         ?PR?_SEND_BYTE?MAIN_AUFGABE1
-            CODE    0B3AH     0083H     UNIT         ?PR?_LCD_CURS?MAIN_AUFGABE1
-            CODE    0BBDH     005CH     UNIT         ?PR?MAIN?MAIN_AUFGABE1
-            CODE    0C19H     0050H     UNIT         ?PR?LCD_INIT?MAIN_AUFGABE1
-            CODE    0C69H     004EH     UNIT         ?PR?_LCD_STR?MAIN_AUFGABE1
-            CODE    0CB7H     0048H     UNIT         ?PR?_LCD_INT?MAIN_AUFGABE1
-            CODE    0CFFH     0042H     UNIT         ?CO?MAIN_AUFGABE1
-            CODE    0D41H     003AH     UNIT         ?PR?_LCD_BYTE?MAIN_AUFGABE1
-            CODE    0D7BH     001EH     UNIT         ?PR?_ASC_OUT?MAIN_AUFGABE1
-            CODE    0D99H     001DH     UNIT         ?PR?_WAIT?MAIN_AUFGABE1
-            CODE    0DB6H     001AH     UNIT         ?PR?INIT?MAIN_AUFGABE1
-            CODE    0DD0H     0014H     UNIT         ?PR?LCD_CLR?MAIN_AUFGABE1
-            CODE    0DE4H     000FH     UNIT         ?PR?WAIT_BSY1?MAIN_AUFGABE1
-            CODE    0DF3H     000FH     UNIT         ?PR?WAIT_BSY2?MAIN_AUFGABE1
-            CODE    0E02H     000EH     UNIT         ?PR?SENDTRIGGERPULSE?MAIN_AUFGABE1
-            CODE    0E10H     000CH     UNIT         ?C_C51STARTUP
-            CODE    0E1CH     0006H     UNIT         ?PR?ECHO_INTERRUPT?MAIN_AUFGABE1
-BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  02/29/2024  21:52:43  PAGE 2
+            CODE    09C2H     011AH     UNIT         ?PR?_LCD_DISTANCE?MAIN_AUFGABE2
+            CODE    0ADCH     00B7H     UNIT         ?PR?_SEND_BYTE?MAIN_AUFGABE2
+            CODE    0B93H     0083H     UNIT         ?PR?_LCD_CURS?MAIN_AUFGABE2
+            CODE    0C16H     0067H     UNIT         ?PR?CALCULATE_DISTANCE?MAIN_AUFGABE2
+            CODE    0C7DH     0050H     UNIT         ?PR?LCD_INIT?MAIN_AUFGABE2
+            CODE    0CCDH     004EH     UNIT         ?PR?_LCD_STR?MAIN_AUFGABE2
+            CODE    0D1BH     0048H     UNIT         ?PR?_LCD_INT?MAIN_AUFGABE2
+            CODE    0D63H     003DH     UNIT         ?CO?MAIN_AUFGABE2
+            CODE    0DA0H     003AH     UNIT         ?PR?_LCD_BYTE?MAIN_AUFGABE2
+            CODE    0DDAH     0020H     UNIT         ?PR?MAIN?MAIN_AUFGABE2
+            CODE    0DFAH     001EH     UNIT         ?PR?_ASC_OUT?MAIN_AUFGABE2
+            CODE    0E18H     001EH     UNIT         ?PR?TIMER_UEBERLAUF?MAIN_AUFGABE2
+            CODE    0E36H     001DH     UNIT         ?PR?_WAIT?MAIN_AUFGABE2
+            CODE    0E53H     001AH     UNIT         ?PR?INIT?MAIN_AUFGABE2
+            CODE    0E6DH     0014H     UNIT         ?PR?LCD_CLR?MAIN_AUFGABE2
+            CODE    0E81H     0014H     UNIT         ?PR?SENDTRIGGERPULSE?MAIN_AUFGABE2
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  03/07/2024  20:22:39  PAGE 2
+
+
+            CODE    0E95H     000FH     UNIT         ?PR?WAIT_BSY1?MAIN_AUFGABE2
+            CODE    0EA4H     000FH     UNIT         ?PR?WAIT_BSY2?MAIN_AUFGABE2
+            CODE    0EB3H     000CH     UNIT         ?C_C51STARTUP
+            CODE    0EBFH     0006H     UNIT         ?PR?ECHO_INTERRUPT?MAIN_AUFGABE2
 
 
 
+OVERLAY MAP OF MODULE:   .\Objects\entfernungsmessung (MAIN_AUFGABE2)
 
 
-OVERLAY MAP OF MODULE:   .\Objects\entfernungsmessung (MAIN_AUFGABE1)
+SEGMENT                                        DATA_GROUP 
+  +--> CALLED SEGMENT                        START    LENGTH
+------------------------------------------------------------
+?C_C51STARTUP                                -----    -----
+  +--> ?PR?MAIN?MAIN_AUFGABE2
+
+?PR?MAIN?MAIN_AUFGABE2                       -----    -----
+  +--> ?PR?INIT?MAIN_AUFGABE2
+  +--> ?PR?SENDTRIGGERPULSE?MAIN_AUFGABE2
+  +--> ?PR?CALCULATE_DISTANCE?MAIN_AUFGABE2
+  +--> ?PR?_LCD_DISTANCE?MAIN_AUFGABE2
+  +--> ?PR?_WAIT?MAIN_AUFGABE2
+
+?PR?INIT?MAIN_AUFGABE2                       -----    -----
+  +--> ?PR?LCD_INIT?MAIN_AUFGABE2
+  +--> ?PR?LCD_CLR?MAIN_AUFGABE2
+
+?PR?LCD_INIT?MAIN_AUFGABE2                   -----    -----
+  +--> ?PR?WAIT_BSY2?MAIN_AUFGABE2
+  +--> ?PR?_SEND_BYTE?MAIN_AUFGABE2
+
+?PR?_SEND_BYTE?MAIN_AUFGABE2                 0013H    000AH
+
+?PR?LCD_CLR?MAIN_AUFGABE2                    -----    -----
+  +--> ?PR?_SEND_BYTE?MAIN_AUFGABE2
+  +--> ?PR?WAIT_BSY2?MAIN_AUFGABE2
+  +--> ?PR?WAIT_BSY1?MAIN_AUFGABE2
+
+?PR?SENDTRIGGERPULSE?MAIN_AUFGABE2           -----    -----
+  +--> ?PR?_WAIT?MAIN_AUFGABE2
+
+?PR?_LCD_DISTANCE?MAIN_AUFGABE2              0008H    0006H
+  +--> ?PR?_LCD_CURS?MAIN_AUFGABE2
+  +--> ?PR?LCD_CLR?MAIN_AUFGABE2
+  +--> ?CO?MAIN_AUFGABE2
+  +--> ?PR?_LCD_STR?MAIN_AUFGABE2
+  +--> ?PR?_ASC_OUT?MAIN_AUFGABE2
+
+?PR?_LCD_CURS?MAIN_AUFGABE2                  0012H    0001H
+  +--> ?PR?_SEND_BYTE?MAIN_AUFGABE2
+  +--> ?PR?WAIT_BSY1?MAIN_AUFGABE2
+
+?PR?_LCD_STR?MAIN_AUFGABE2                   000EH    0004H
+  +--> ?PR?_ASC_OUT?MAIN_AUFGABE2
+  +--> ?PR?_LCD_CURS?MAIN_AUFGABE2
+
+?PR?_ASC_OUT?MAIN_AUFGABE2                   -----    -----
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  03/07/2024  20:22:39  PAGE 3
 
 
-SEGMENT                                      DATA_GROUP 
-  +--> CALLED SEGMENT                      START    LENGTH
-----------------------------------------------------------
-?C_C51STARTUP                              -----    -----
-  +--> ?PR?MAIN?MAIN_AUFGABE1
-
-?PR?MAIN?MAIN_AUFGABE1                     -----    -----
-  +--> ?PR?INIT?MAIN_AUFGABE1
-  +--> ?PR?SENDTRIGGERPULSE?MAIN_AUFGABE1
-  +--> ?PR?_LCD_DISTANCE?MAIN_AUFGABE1
-  +--> ?PR?_WAIT?MAIN_AUFGABE1
-
-?PR?INIT?MAIN_AUFGABE1                     -----    -----
-  +--> ?PR?LCD_INIT?MAIN_AUFGABE1
-  +--> ?PR?LCD_CLR?MAIN_AUFGABE1
-
-?PR?LCD_INIT?MAIN_AUFGABE1                 -----    -----
-  +--> ?PR?WAIT_BSY2?MAIN_AUFGABE1
-  +--> ?PR?_SEND_BYTE?MAIN_AUFGABE1
-
-?PR?_SEND_BYTE?MAIN_AUFGABE1               0012H    000AH
-
-?PR?LCD_CLR?MAIN_AUFGABE1                  -----    -----
-  +--> ?PR?_SEND_BYTE?MAIN_AUFGABE1
-  +--> ?PR?WAIT_BSY2?MAIN_AUFGABE1
-  +--> ?PR?WAIT_BSY1?MAIN_AUFGABE1
-
-?PR?SENDTRIGGERPULSE?MAIN_AUFGABE1         -----    -----
-  +--> ?PR?_WAIT?MAIN_AUFGABE1
-
-?PR?_LCD_DISTANCE?MAIN_AUFGABE1            0008H    0005H
-  +--> ?PR?_LCD_CURS?MAIN_AUFGABE1
-  +--> ?PR?LCD_CLR?MAIN_AUFGABE1
-  +--> ?CO?MAIN_AUFGABE1
-  +--> ?PR?_LCD_STR?MAIN_AUFGABE1
-  +--> ?PR?_ASC_OUT?MAIN_AUFGABE1
-
-?PR?_LCD_CURS?MAIN_AUFGABE1                0011H    0001H
-  +--> ?PR?_SEND_BYTE?MAIN_AUFGABE1
-  +--> ?PR?WAIT_BSY1?MAIN_AUFGABE1
-
-?PR?_LCD_STR?MAIN_AUFGABE1                 000DH    0004H
-  +--> ?PR?_ASC_OUT?MAIN_AUFGABE1
-  +--> ?PR?_LCD_CURS?MAIN_AUFGABE1
-
-?PR?_ASC_OUT?MAIN_AUFGABE1                 -----    -----
-  +--> ?PR?_SEND_BYTE?MAIN_AUFGABE1
-  +--> ?PR?WAIT_BSY1?MAIN_AUFGABE1
+  +--> ?PR?_SEND_BYTE?MAIN_AUFGABE2
+  +--> ?PR?WAIT_BSY1?MAIN_AUFGABE2
 
 
 
-BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  02/29/2024  21:52:43  PAGE 3
-
-
-SYMBOL TABLE OF MODULE:  .\Objects\entfernungsmessung (MAIN_AUFGABE1)
+SYMBOL TABLE OF MODULE:  .\Objects\entfernungsmessung (MAIN_AUFGABE2)
 
   VALUE           TYPE          NAME
   ----------------------------------
 
-  -------         MODULE        MAIN_AUFGABE1
+  -------         MODULE        MAIN_AUFGABE2
   C:0000H         SYMBOL        _ICE_DUMMY_
+  D:001DH         PUBLIC        passed_ticks
   B:00A8H.7       PUBLIC        EA
-  C:0E02H         PUBLIC        sendTriggerPulse
-  C:0DE4H         PUBLIC        wait_bsy1
-  C:0DF3H         PUBLIC        wait_bsy2
-  D:001CH         PUBLIC        TH
-  C:0BBDH         PUBLIC        main
+  C:0E81H         PUBLIC        sendTriggerPulse
+  D:0021H         PUBLIC        passed_time
+  C:0E95H         PUBLIC        wait_bsy1
+  C:0EA4H         PUBLIC        wait_bsy2
+  C:0DDAH         PUBLIC        main
   D:00B4H         PUBLIC        IRCON0
   B:0090H.6       PUBLIC        sclk
   D:0090H         PUBLIC        P1_PUDSEL
   D:0089H         PUBLIC        TMOD
-  C:0DB6H         PUBLIC        init
-  C:0D99H         PUBLIC        _wait
+  C:0E53H         PUBLIC        init
+  C:0E36H         PUBLIC        _wait
   D:0086H         PUBLIC        P0_DIR
   B:0090H.5       PUBLIC        sid
   D:0091H         PUBLIC        P1_DIR
-  C:0A86H         PUBLIC        _send_byte
+  C:0ADFH         PUBLIC        _send_byte
   D:00B2H         PUBLIC        PORT_PAGE
-  B:0088H.5       PUBLIC        TF0
-  C:0D41H         PUBLIC        _lcd_byte
-  C:0C19H         PUBLIC        lcd_init
+  C:0E18H         PUBLIC        timer_ueberlauf
+  D:0025H         PUBLIC        t0_ueberlauf
+  B:00A8H.1       PUBLIC        ET0
+  C:0DA0H         PUBLIC        _lcd_byte
+  C:0C7DH         PUBLIC        lcd_init
   B:0088H.7       PUBLIC        TF1
   D:008CH         PUBLIC        TH0
   B:0088H.0       PUBLIC        IT0
   B:00A8H.0       PUBLIC        EX0
   D:008DH         PUBLIC        TH1
-  D:0020H         PUBLIC        distance
+  D:0029H         PUBLIC        distance
   D:008AH         PUBLIC        TL0
   D:008BH         PUBLIC        TL1
-  C:0B3AH         PUBLIC        _lcd_curs
+  C:0B93H         PUBLIC        _lcd_curs
   B:0088H.4       PUBLIC        TR0
-  C:0DD0H         PUBLIC        lcd_clr
+  C:0E6DH         PUBLIC        lcd_clr
   B:0088H.6       PUBLIC        TR1
   D:0091H         PUBLIC        P1_PUDEN
-  C:0CB7H         PUBLIC        _lcd_int
+  C:0D1BH         PUBLIC        _lcd_int
   C:09C2H         PUBLIC        _lcd_distance
-  C:0C69H         PUBLIC        _lcd_str
-  C:0D8EH         PUBLIC        _asc_out
-  C:0E1CH         PUBLIC        echo_interrupt
-  D:00B7H         PUBLIC        EXICON0
+  C:0C16H         PUBLIC        calculate_distance
+  C:0CCDH         PUBLIC        _lcd_str
+  C:0E0DH         PUBLIC        _asc_out
+  C:0EBFH         PUBLIC        echo_interrupt
   D:0090H         PUBLIC        P1_DATA
-  -------         PROC          L?0059
-  -------         ENDPROC       L?0059
+  -------         PROC          L?0063
+  -------         ENDPROC       L?0063
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  03/07/2024  20:22:39  PAGE 4
+
+
   -------         PROC          _SEND_BYTE
   D:0007H         SYMBOL        senddata
-  D:0012H         SYMBOL        rs
+  D:0013H         SYMBOL        rs
   -------         DO            
-  D:0013H         SYMBOL        i
-  D:0014H         SYMBOL        sendwert
-  D:0018H         SYMBOL        zw
+  D:0014H         SYMBOL        i
+  D:0015H         SYMBOL        sendwert
+  D:0019H         SYMBOL        zw
   -------         ENDDO         
-BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  02/29/2024  21:52:43  PAGE 4
-
-
-  C:0A86H         LINE#         26
-  C:0A88H         LINE#         27
-  C:0A88H         LINE#         30
-  C:0A91H         LINE#         31
-  C:0ADAH         LINE#         32
-  C:0AF5H         LINE#         33
-  C:0B03H         LINE#         34
-  C:0B05H         LINE#         35
-  C:0B1CH         LINE#         36
-  C:0B1EH         LINE#         37
-  C:0B20H         LINE#         38
-  C:0B35H         LINE#         39
-  C:0B39H         LINE#         40
+  C:0ADFH         LINE#         26
+  C:0AE1H         LINE#         27
+  C:0AE1H         LINE#         30
+  C:0AEAH         LINE#         31
+  C:0B33H         LINE#         32
+  C:0B4EH         LINE#         33
+  C:0B5CH         LINE#         34
+  C:0B5EH         LINE#         35
+  C:0B75H         LINE#         36
+  C:0B77H         LINE#         37
+  C:0B79H         LINE#         38
+  C:0B8EH         LINE#         39
+  C:0B92H         LINE#         40
   -------         ENDPROC       _SEND_BYTE
   -------         PROC          WAIT_BSY1
   -------         DO            
   D:0006H         SYMBOL        zaehler
   -------         ENDDO         
-  C:0DE4H         LINE#         41
-  C:0DE4H         LINE#         42
-  C:0DE4H         LINE#         44
-  C:0DF2H         LINE#         45
+  C:0E95H         LINE#         41
+  C:0E95H         LINE#         42
+  C:0E95H         LINE#         44
+  C:0EA3H         LINE#         45
   -------         ENDPROC       WAIT_BSY1
   -------         PROC          WAIT_BSY2
   -------         DO            
   D:0006H         SYMBOL        zaehler
   -------         ENDDO         
-  C:0DF3H         LINE#         46
-  C:0DF3H         LINE#         47
-  C:0DF3H         LINE#         49
-  C:0E01H         LINE#         50
+  C:0EA4H         LINE#         46
+  C:0EA4H         LINE#         47
+  C:0EA4H         LINE#         49
+  C:0EB2H         LINE#         50
   -------         ENDPROC       WAIT_BSY2
   -------         PROC          LCD_INIT
-  C:0C19H         LINE#         51
-  C:0C19H         LINE#         52
-  C:0C19H         LINE#         53
-  C:0C1CH         LINE#         54
-  C:0C1FH         LINE#         55
-  C:0C22H         LINE#         57
-  C:0C24H         LINE#         58
-  C:0C27H         LINE#         59
-  C:0C2AH         LINE#         60
-  C:0C2DH         LINE#         62
-  C:0C34H         LINE#         63
-  C:0C37H         LINE#         64
-  C:0C3EH         LINE#         65
-  C:0C41H         LINE#         66
-  C:0C48H         LINE#         67
-  C:0C4BH         LINE#         68
-  C:0C52H         LINE#         69
-  C:0C55H         LINE#         70
-  C:0C5CH         LINE#         71
-  C:0C5FH         LINE#         72
-  C:0C66H         LINE#         73
+  C:0C7DH         LINE#         51
+  C:0C7DH         LINE#         52
+  C:0C7DH         LINE#         53
+  C:0C80H         LINE#         54
+  C:0C83H         LINE#         55
+  C:0C86H         LINE#         57
+  C:0C88H         LINE#         58
+  C:0C8BH         LINE#         59
+  C:0C8EH         LINE#         60
+  C:0C91H         LINE#         62
+  C:0C98H         LINE#         63
+  C:0C9BH         LINE#         64
+  C:0CA2H         LINE#         65
+  C:0CA5H         LINE#         66
+  C:0CACH         LINE#         67
+  C:0CAFH         LINE#         68
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  03/07/2024  20:22:39  PAGE 5
+
+
+  C:0CB6H         LINE#         69
+  C:0CB9H         LINE#         70
+  C:0CC0H         LINE#         71
+  C:0CC3H         LINE#         72
+  C:0CCAH         LINE#         73
   -------         ENDPROC       LCD_INIT
   -------         PROC          LCD_CLR
-  C:0DD0H         LINE#         77
-BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  02/29/2024  21:52:43  PAGE 5
-
-
-  C:0DD0H         LINE#         78
-  C:0DD7H         LINE#         79
-  C:0DDAH         LINE#         80
-  C:0DE1H         LINE#         81
+  C:0E6DH         LINE#         77
+  C:0E6DH         LINE#         78
+  C:0E74H         LINE#         79
+  C:0E77H         LINE#         80
+  C:0E7EH         LINE#         81
   -------         ENDPROC       LCD_CLR
-  C:0D83H         SYMBOL        L?0058
-  -------         PROC          L?0057
-  -------         ENDPROC       L?0057
-  C:0D83H         SYMBOL        L?0058
+  C:0E02H         SYMBOL        L?0062
+  -------         PROC          L?0061
+  -------         ENDPROC       L?0061
+  C:0E02H         SYMBOL        L?0062
   -------         PROC          _ASC_OUT
   D:0007H         SYMBOL        zeichen
-  C:0D8EH         LINE#         83
-  C:0D8EH         LINE#         84
-  C:0D8EH         LINE#         85
-  C:0D93H         LINE#         86
-  C:0D96H         LINE#         87
+  C:0E0DH         LINE#         83
+  C:0E0DH         LINE#         84
+  C:0E0DH         LINE#         85
+  C:0E12H         LINE#         86
+  C:0E15H         LINE#         87
   -------         ENDPROC       _ASC_OUT
   -------         PROC          _LCD_STR
-  D:000DH         SYMBOL        ptr
+  D:000EH         SYMBOL        ptr
   -------         DO            
-  D:0010H         SYMBOL        i
+  D:0011H         SYMBOL        i
   -------         ENDDO         
-  C:0C69H         LINE#         89
-  C:0C6FH         LINE#         90
-  C:0C6FH         LINE#         91
-  C:0C72H         LINE#         92
-  C:0C83H         LINE#         93
-  C:0C83H         LINE#         94
-  C:0C86H         LINE#         95
-  C:0C91H         LINE#         96
-  C:0C93H         LINE#         97
-  C:0C9EH         LINE#         98
-  C:0CA9H         LINE#         99
-  C:0CB4H         LINE#         100
-  C:0CB6H         LINE#         101
+  C:0CCDH         LINE#         89
+  C:0CD3H         LINE#         90
+  C:0CD3H         LINE#         91
+  C:0CD6H         LINE#         92
+  C:0CE7H         LINE#         93
+  C:0CE7H         LINE#         94
+  C:0CEAH         LINE#         95
+  C:0CF5H         LINE#         96
+  C:0CF7H         LINE#         97
+  C:0D02H         LINE#         98
+  C:0D0DH         LINE#         99
+  C:0D18H         LINE#         100
+  C:0D1AH         LINE#         101
   -------         ENDPROC       _LCD_STR
   -------         PROC          _LCD_BYTE
-  D:0026H         SYMBOL        wert
+  D:002FH         SYMBOL        wert
   -------         DO            
   D:0007H         SYMBOL        i
   -------         ENDDO         
-  C:0D41H         LINE#         102
-  C:0D43H         LINE#         103
-  C:0D43H         LINE#         106
-  C:0D4AH         LINE#         107
-  C:0D53H         LINE#         108
-  C:0D57H         LINE#         109
-  C:0D5AH         LINE#         110
-  C:0D61H         LINE#         111
-  C:0D6AH         LINE#         112
-  C:0D6EH         LINE#         113
-  C:0D71H         LINE#         114
-  C:0D77H         LINE#         115
+  C:0DA0H         LINE#         102
+  C:0DA2H         LINE#         103
+  C:0DA2H         LINE#         106
+  C:0DA9H         LINE#         107
+  C:0DB2H         LINE#         108
+  C:0DB6H         LINE#         109
+  C:0DB9H         LINE#         110
+  C:0DC0H         LINE#         111
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  03/07/2024  20:22:39  PAGE 6
+
+
+  C:0DC9H         LINE#         112
+  C:0DCDH         LINE#         113
+  C:0DD0H         LINE#         114
+  C:0DD6H         LINE#         115
   -------         ENDPROC       _LCD_BYTE
   -------         PROC          _LCD_INT
-  D:0024H         SYMBOL        wert_16
+  D:002DH         SYMBOL        wert_16
   -------         DO            
-BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  02/29/2024  21:52:43  PAGE 6
-
-
   D:0003H         SYMBOL        i
   -------         ENDDO         
-  C:0CB7H         LINE#         117
-  C:0CBBH         LINE#         118
-  C:0CBBH         LINE#         121
-  C:0CC4H         LINE#         122
-  C:0CCCH         LINE#         123
-  C:0CCFH         LINE#         124
-  C:0CDAH         LINE#         125
-  C:0CDCH         LINE#         126
-  C:0CDFH         LINE#         127
-  C:0CEAH         LINE#         128
-  C:0CECH         LINE#         129
-  C:0CEFH         LINE#         130
-  C:0CFAH         LINE#         131
+  C:0D1BH         LINE#         117
+  C:0D1FH         LINE#         118
+  C:0D1FH         LINE#         121
+  C:0D28H         LINE#         122
+  C:0D30H         LINE#         123
+  C:0D33H         LINE#         124
+  C:0D3EH         LINE#         125
+  C:0D40H         LINE#         126
+  C:0D43H         LINE#         127
+  C:0D4EH         LINE#         128
+  C:0D50H         LINE#         129
+  C:0D53H         LINE#         130
+  C:0D5EH         LINE#         131
   -------         ENDPROC       _LCD_INT
   -------         PROC          _LCD_CURS
-  D:0011H         SYMBOL        pos
-  C:0B3AH         LINE#         133
-  C:0B3CH         LINE#         134
-  C:0B3CH         LINE#         135
-  C:0B45H         LINE#         136
-  C:0B57H         LINE#         137
-  C:0B75H         LINE#         138
-  C:0B96H         LINE#         139
-  C:0BB7H         LINE#         141
-  C:0BBAH         LINE#         142
+  D:0012H         SYMBOL        pos
+  C:0B93H         LINE#         133
+  C:0B95H         LINE#         134
+  C:0B95H         LINE#         135
+  C:0B9EH         LINE#         136
+  C:0BB0H         LINE#         137
+  C:0BCEH         LINE#         138
+  C:0BEFH         LINE#         139
+  C:0C10H         LINE#         141
+  C:0C13H         LINE#         142
   -------         ENDPROC       _LCD_CURS
   -------         PROC          MAIN
-  C:0BBDH         LINE#         18
-  C:0BBDH         LINE#         19
-  C:0BBDH         LINE#         20
-  C:0BC0H         LINE#         22
-  C:0BC0H         LINE#         23
-  C:0BC0H         LINE#         24
-  C:0BC3H         LINE#         27
-  C:0BC6H         LINE#         28
-  C:0BC8H         LINE#         29
-  C:0BCAH         LINE#         30
-  C:0BCCH         LINE#         33
-  C:0BCFH         LINE#         36
-  C:0BECH         LINE#         37
-  C:0C0DH         LINE#         40
-  C:0C10H         LINE#         42
-  C:0C17H         LINE#         43
+  C:0DDAH         LINE#         22
+  C:0DDAH         LINE#         23
+  C:0DDAH         LINE#         24
+  C:0DDDH         LINE#         26
+  C:0DDDH         LINE#         27
+  C:0DDDH         LINE#         28
+  C:0DE0H         LINE#         30
+  C:0DE3H         LINE#         32
+  C:0DE6H         LINE#         34
+  C:0DF1H         LINE#         36
+  C:0DF8H         LINE#         37
   -------         ENDPROC       MAIN
+  -------         PROC          ECHO_INTERRUPT
+  C:0EBFH         LINE#         42
+  C:0EBFH         LINE#         44
+  C:0EC1H         LINE#         45
+  C:0EC4H         LINE#         46
+  -------         ENDPROC       ECHO_INTERRUPT
+  -------         PROC          TIMER_UEBERLAUF
+  C:0E18H         LINE#         50
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  03/07/2024  20:22:39  PAGE 7
+
+
+  C:0E1CH         LINE#         52
+  C:0E31H         LINE#         53
+  -------         ENDPROC       TIMER_UEBERLAUF
   -------         PROC          INIT
-  C:0DB6H         LINE#         47
-  C:0DB6H         LINE#         48
-  C:0DB6H         LINE#         49
-  C:0DB9H         LINE#         50
-  C:0DBCH         LINE#         52
-  C:0DBFH         LINE#         53
-  C:0DC2H         LINE#         55
-  C:0DC5H         LINE#         58
-  C:0DC7H         LINE#         61
-  C:0DC9H         LINE#         62
-BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  02/29/2024  21:52:43  PAGE 7
-
-
-  C:0DCBH         LINE#         63
-  C:0DCDH         LINE#         64
-  C:0DCFH         LINE#         65
+  C:0E53H         LINE#         57
+  C:0E53H         LINE#         58
+  C:0E53H         LINE#         59
+  C:0E56H         LINE#         60
+  C:0E59H         LINE#         62
+  C:0E5CH         LINE#         63
+  C:0E5FH         LINE#         65
+  C:0E62H         LINE#         66
+  C:0E64H         LINE#         68
+  C:0E66H         LINE#         69
+  C:0E68H         LINE#         70
+  C:0E6AH         LINE#         71
+  C:0E6CH         LINE#         73
   -------         ENDPROC       INIT
+  -------         PROC          CALCULATE_DISTANCE
+  C:0C16H         LINE#         77
+  C:0C16H         LINE#         78
+  C:0C16H         LINE#         79
+  C:0C48H         LINE#         80
+  C:0C61H         LINE#         81
+  C:0C73H         LINE#         83
+  C:0C7CH         LINE#         84
+  -------         ENDPROC       CALCULATE_DISTANCE
   -------         PROC          _WAIT
   D:0006H         SYMBOL        t
   -------         DO            
   D:0004H         SYMBOL        i
   -------         ENDDO         
-  C:0D99H         LINE#         68
-  C:0D99H         LINE#         69
-  C:0D99H         LINE#         73
-  C:0DA3H         LINE#         74
-  C:0DA3H         LINE#         75
-  C:0DA6H         LINE#         76
-  C:0DA9H         LINE#         77
-  C:0DACH         LINE#         78
-  C:0DAEH         LINE#         79
-  C:0DB5H         LINE#         80
+  C:0E36H         LINE#         88
+  C:0E36H         LINE#         89
+  C:0E36H         LINE#         91
+  C:0E40H         LINE#         92
+  C:0E40H         LINE#         93
+  C:0E43H         LINE#         94
+  C:0E46H         LINE#         95
+  C:0E49H         LINE#         96
+  C:0E4BH         LINE#         97
+  C:0E52H         LINE#         98
   -------         ENDPROC       _WAIT
-  -------         PROC          ECHO_INTERRUPT
-  C:0E1CH         LINE#         83
-  C:0E1CH         LINE#         84
-  C:0E1EH         LINE#         85
-  C:0E21H         LINE#         86
-  -------         ENDPROC       ECHO_INTERRUPT
+  -------         PROC          SENDTRIGGERPULSE
+  C:0E81H         LINE#         102
+  C:0E81H         LINE#         103
+  C:0E81H         LINE#         104
+  C:0E84H         LINE#         105
+  C:0E86H         LINE#         107
+  C:0E89H         LINE#         108
+  C:0E8FH         LINE#         109
+  C:0E92H         LINE#         111
+  C:0E94H         LINE#         112
+  -------         ENDPROC       SENDTRIGGERPULSE
   -------         PROC          _LCD_DISTANCE
   D:0008H         SYMBOL        value
   -------         DO            
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  03/07/2024  20:22:39  PAGE 8
+
+
   D:000CH         SYMBOL        i
+  D:000DH         SYMBOL        j
   -------         ENDDO         
-  C:09C2H         LINE#         89
-  C:09CAH         LINE#         90
-  C:09CAH         LINE#         93
-  C:09CFH         LINE#         94
-  C:09D2H         LINE#         95
-  C:09DBH         LINE#         97
-  C:09EFH         LINE#         98
-  C:09EFH         LINE#         99
-  C:09F8H         LINE#         100
-  C:09FDH         LINE#         101
-  C:0A03H         LINE#         102
-  C:0A05H         LINE#         104
-  C:0A19H         LINE#         105
-  C:0A19H         LINE#         106
-  C:0A22H         LINE#         107
-  C:0A27H         LINE#         108
-  C:0A2DH         LINE#         109
-  C:0A2FH         LINE#         111
-  C:0A2FH         LINE#         112
-  C:0A42H         LINE#         113
-  C:0A63H         LINE#         114
-  C:0A6DH         LINE#         115
-  C:0A75H         LINE#         116
-  C:0A7EH         LINE#         117
-  C:0A7EH         LINE#         118
+  C:09C2H         LINE#         117
+  C:09CAH         LINE#         118
+  C:09CAH         LINE#         120
+  C:09CFH         LINE#         121
+  C:09D2H         LINE#         122
+  C:09DBH         LINE#         125
+  C:09F0H         LINE#         126
+  C:09F0H         LINE#         127
+  C:09F9H         LINE#         128
+  C:09FEH         LINE#         129
+  C:0A04H         LINE#         130
+  C:0A07H         LINE#         132
+  C:0A1BH         LINE#         133
+  C:0A1BH         LINE#         134
+  C:0A24H         LINE#         135
+  C:0A29H         LINE#         136
+  C:0A2FH         LINE#         137
+  C:0A32H         LINE#         140
+  C:0A32H         LINE#         141
+  C:0A45H         LINE#         142
+  C:0A66H         LINE#         143
+  C:0A70H         LINE#         145
+  C:0A83H         LINE#         146
+  C:0AA4H         LINE#         147
+  C:0AB8H         LINE#         149
+  C:0ACDH         LINE#         150
+  C:0AD2H         LINE#         152
+  C:0ADBH         LINE#         153
+  C:0ADBH         LINE#         155
   -------         ENDPROC       _LCD_DISTANCE
-BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  02/29/2024  21:52:43  PAGE 8
-
-
-  -------         PROC          SENDTRIGGERPULSE
-  C:0E02H         LINE#         122
-  C:0E02H         LINE#         123
-  C:0E05H         LINE#         124
-  C:0E0CH         LINE#         125
-  C:0E0FH         LINE#         126
-  -------         ENDPROC       SENDTRIGGERPULSE
-  -------         ENDMOD        MAIN_AUFGABE1
+  -------         ENDMOD        MAIN_AUFGABE2
 
   -------         MODULE        ?C?CLDPTR
   C:0800H         PUBLIC        ?C?CLDPTR
@@ -453,6 +479,9 @@ SYMBOL TABLE OF MODULE:  .\Objects\entfernungsmessung (MAIN_AUFGABE1)
 
   -------         MODULE        ?C?ULSHR
   C:099CH         PUBLIC        ?C?ULSHR
+BL51 BANKED LINKER/LOCATER V6.22.2.0                                                  03/07/2024  20:22:39  PAGE 9
+
+
   -------         ENDMOD        ?C?ULSHR
 
   -------         MODULE        ?C?LSHL
@@ -460,14 +489,14 @@ SYMBOL TABLE OF MODULE:  .\Objects\entfernungsmessung (MAIN_AUFGABE1)
   -------         ENDMOD        ?C?LSHL
 
 *** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
-    SEGMENT: ?PR?_LCD_BYTE?MAIN_AUFGABE1
+    SEGMENT: ?PR?_LCD_BYTE?MAIN_AUFGABE2
 
 *** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
-    SEGMENT: ?PR?_LCD_INT?MAIN_AUFGABE1
+    SEGMENT: ?PR?_LCD_INT?MAIN_AUFGABE2
 
 ******************************************************************************
-* RESTRICTED VERSION WITH 0800H BYTE CODE SIZE LIMIT; USED: 0457H BYTE (54%) *
+* RESTRICTED VERSION WITH 0800H BYTE CODE SIZE LIMIT; USED: 04FDH BYTE (62%) *
 ******************************************************************************
 
-Program Size: data=40.0 xdata=0 code=1576
+Program Size: data=49.0 xdata=0 code=1742
 LINK/LOCATE RUN COMPLETE.  2 WARNING(S),  0 ERROR(S)

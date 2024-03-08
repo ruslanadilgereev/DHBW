@@ -1,4 +1,4 @@
-".\Objects\main_Aufgabe1.obj" 
+".\Objects\main_Aufgabe2.obj" 
 TO ".\Objects\entfernungsmessung" 
 PRINT(".\Listings\entfernungsmessung.m51") RAMSIZE(256) 
 CODE( 0X0000-0X5FFF,0XA000-0XBFFF )
