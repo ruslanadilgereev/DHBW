@@ -1,0 +1,160 @@
+C51 COMPILER V9.60.0.0   1_WIRE_ROUTINEN                                                   03/09/2024 09:54:11 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE 1_WIRE_ROUTINEN
+OBJECT MODULE PLACED IN .\Objects\1_Wire_Routinen.obj
+COMPILER INVOKED BY: C:\DHBW\Mechatronische Systeme in der Anwendung\Software-20240129\C51\BIN\C51.EXE 1_Wire_Routinen.c
+                    - OPTIMIZE(8,SPEED) BROWSE MODP2 DEBUG OBJECTEXTEND PRINT(.\Listings\1_Wire_Routinen.lst) TABS(2) OBJECT(.\Objects\1_Wire
+                    -_Routinen.obj)
+
+line level    source
+
+   1          /*******************************************************************************************/
+   2          /***                     Realisierung des 1-Wire-Delays mit Timer0                       ***/
+   3          /*******************************************************************************************/
+   4          void ow_delay (unsigned int ns)     //in µ Sekunden
+   5                                              //Verwendung von Timer0
+   6          {
+   7   1        unsigned int k;
+   8   1        for (k=0; k<ns; k++)
+   9   1        {
+  10   2          TR0 = 0;                        //Mit TR0=0 den Timer 0 stoppen - falls er noch läuft.
+*** ERROR C202 IN LINE 10 OF 1_Wire_Routinen.c: 'TR0': undefined identifier
+  11   2          TF0 = 0;                        //Mit TF0=0 zunächst das Timer Flag zurücksetzen.
+*** ERROR C202 IN LINE 11 OF 1_Wire_Routinen.c: 'TF0': undefined identifier
+  12   2          TMOD = 0x11;                    //16 Bit Mode für Timer0 und Timer1 auswählen
+*** ERROR C202 IN LINE 12 OF 1_Wire_Routinen.c: 'TMOD': undefined identifier
+  13   2          TL0 = (0xffff - 120) % 256;       //Register TL0 und TH0 mit entsprechenden Werten laden
+*** ERROR C202 IN LINE 13 OF 1_Wire_Routinen.c: 'TL0': undefined identifier
+  14   2          TH0 = (0xffff - 120) / 256;     //Startwert 10µs/0,0833µs) = 120 => Laufzeit 10µs
+*** ERROR C202 IN LINE 14 OF 1_Wire_Routinen.c: 'TH0': undefined identifier
+  15   2      
+  16   2          TR0 = 1;                        //Mit TR0=1 den Timer 0 starten.
+*** ERROR C202 IN LINE 16 OF 1_Wire_Routinen.c: 'TR0': undefined identifier
+  17   2      
+  18   2          while (TF0 == 0);               //While Schleife mit  Abfrage der Bedingung
+*** ERROR C202 IN LINE 18 OF 1_Wire_Routinen.c: 'TF0': undefined identifier
+  19   2         }
+  20   1      }
+  21          
+  22          /*******************************************************************************************/
+  23          /***                                      1-Wire-Reset                                   ***/
+  24          /*******************************************************************************************/
+  25          
+  26          unsigned char ow_reset(void)
+  27          {
+  28   1          unsigned char zw;
+  29   1         
+  30   1          DQ = 0;                  // DQ auf Low
+*** ERROR C202 IN LINE 30 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  31   1          ow_delay(50);            // Min. 480µs Resetimpuls abwarten  
+  32   1          DQ = 1;                  // DQ auf High
+*** ERROR C202 IN LINE 32 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  33   1          P0_DIR = 0x00;           // load direction register P3 0 => Input
+*** ERROR C202 IN LINE 33 OF 1_Wire_Routinen.c: 'P0_DIR': undefined identifier
+  34   1          ow_delay(6);             // 65 µs warten
+  35   1          zw = DQ;                 // Zustand DQ einlesen
+*** ERROR C202 IN LINE 35 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  36   1          ow_delay(42);            // 424 us warten = Ende des Reset-Vorgangs war 124
+  37   1          P0_DIR = 0xFF;           // load direction register P3 1 => Output
+*** ERROR C202 IN LINE 37 OF 1_Wire_Routinen.c: 'P0_DIR': undefined identifier
+  38   1          return(zw);              // Rueckgabe: 0 => Sensor vorhanden, 1 => kein Sensor vorhanden
+  39   1      }
+  40          
+  41          /*******************************************************************************************/
+C51 COMPILER V9.60.0.0   1_WIRE_ROUTINEN                                                   03/09/2024 09:54:11 PAGE 2   
+
+  42          /***                  Ausgabe eines Bits über den 1-Wire-Bus                             ***/
+  43          /*******************************************************************************************/
+  44          
+  45          void ow_wr_bit(unsigned char bitwert)
+  46          {
+  47   1          DQ = 0;                  // Start Time Slot: DQ auf Low
+*** ERROR C202 IN LINE 47 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  48   1                                          
+  49   1          if(bitwert==1) DQ = 1;   // Bei log´1´: sofort wieder
+*** ERROR C202 IN LINE 49 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  50   1                                   // auf High = nur kurzer Low-Impuls
+  51   1          ow_delay(10);            // ca. 105 us warten bis 
+  52   1                                   // Ende des Time Slots
+  53   1          DQ = 1;                  // DQ wieder auf High
+*** ERROR C202 IN LINE 53 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  54   1      }
+  55          
+  56          /*******************************************************************************************/
+  57          /***                Einlesen eines Bits über den 1-Wire-Bus                              ***/
+  58          /*******************************************************************************************/
+  59          unsigned char ow_rd_bit(void)
+  60          {
+  61   1          unsigned char zw;
+  62   1      
+  63   1          DQ = 0;                  // DQ auf Low
+*** ERROR C202 IN LINE 63 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  64   1          DQ = 1;
+*** ERROR C202 IN LINE 64 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  65   1          P0_DIR = 0x00;           // load direction register P0 0 = Input
+*** ERROR C202 IN LINE 65 OF 1_Wire_Routinen.c: 'P0_DIR': undefined identifier
+  66   1          ow_delay(1);             // 15 us warten
+  67   1          zw = DQ;                 // DQ einlesen und speichern
+*** ERROR C202 IN LINE 67 OF 1_Wire_Routinen.c: 'DQ': undefined identifier
+  68   1          ow_delay(4);
+  69   1          P0_DIR = 0xFF;           // load direction register P0 1 = Output
+*** ERROR C202 IN LINE 69 OF 1_Wire_Routinen.c: 'P0_DIR': undefined identifier
+  70   1      //  DQ = 1;                  // bis Ende Time Slot
+  71   1          return(zw);              // Rückgabe von DQ
+  72   1      }
+  73          
+  74          /*******************************************************************************************/
+  75          /***                            Ausgabe eines Bytes über den 1-Wire-Bus                  ***/
+  76          /*******************************************************************************************/
+  77          
+  78          void ow_wr_byte(unsigned char dat)
+  79          {
+  80   1          unsigned char i;
+  81   1          unsigned char maske = 1;
+  82   1      
+  83   1          // 8 Bits nacheinander raus schieben, LSB zuerst
+  84   1          for (i=0; i<8; i++)
+  85   1          {
+  86   2              if (dat & maske) ow_wr_bit(1);          // log.´1´ senden
+  87   2              else ow_wr_bit(0);                      // log.´0´ senden
+  88   2              maske = maske * 2;                      // nächstes Bit selektieren
+  89   2          }
+  90   1      }
+  91          
+  92          /*******************************************************************************************/
+  93          /***                   Einlesen von 8 Bytes über den 1-Wire-Bus                          ***/
+  94          /*******************************************************************************************/
+  95          unsigned char ow_rd_byte(void)
+C51 COMPILER V9.60.0.0   1_WIRE_ROUTINEN                                                   03/09/2024 09:54:11 PAGE 3   
+
+  96          {
+  97   1          unsigned char i;
+  98   1          unsigned char wert = 0;
+  99   1          // 8 Bits hintereinander einlesen, LSB zuerst
+ 100   1          for(i=0; i<8; i++)
+ 101   1          {
+ 102   2              if (ow_rd_bit()) wert |=0x01 << i;
+ 103   2          
+ 104   2          ow_delay(2);
+ 105   2        }
+ 106   1        return(wert);
+ 107   1      }
+ 108          
+ 109          /*******************************************************************************************/
+ 110          /***          Antwort einlesen: 8 Byte = 64 Bit ins globale Array rom_c[i]               ***/
+ 111          /*******************************************************************************************/
+ 112          
+ 113          void ow_rd_rom(void)
+ 114          {
+ 115   1          unsigned char i;
+ 116   1      
+ 117   1          for (i=0; i<8; i++)
+ 118   1          {
+ 119   2              rom_c[i] = ow_rd_byte();
+*** ERROR C202 IN LINE 119 OF 1_Wire_Routinen.c: 'rom_c': undefined identifier
+ 120   2          }
+ 121   1        ow_delay(10);
+ 122   1      }
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  21 ERROR(S)

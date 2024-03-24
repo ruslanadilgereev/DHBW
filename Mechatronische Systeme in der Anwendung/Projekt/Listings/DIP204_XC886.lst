@@ -1,0 +1,175 @@
+C51 COMPILER V9.60.0.0   DIP204_XC886                                                      03/09/2024 10:32:49 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE DIP204_XC886
+OBJECT MODULE PLACED IN .\Objects\DIP204_XC886.obj
+COMPILER INVOKED BY: C:\DHBW\Mechatronische Systeme in der Anwendung\Software-20240129\C51\BIN\C51.EXE DIP204_XC886.c OP
+                    -TIMIZE(8,SPEED) BROWSE MODP2 DEBUG OBJECTEXTEND PRINT(.\Listings\DIP204_XC886.lst) TABS(2) OBJECT(.\Objects\DIP204_XC886
+                    -.obj)
+
+line level    source
+
+   1          //******************************************************************
+   2          // LCD-Funktionen für XC886 Board
+   3          // R. Birk Mai 07 
+   4          // Ansteuerung LCD-Display seriell (4 * 20 Zeichen LCD) 
+   5          // Filename: lcd_XC886.c
+   6          //******************************************************************
+   7          #include <xc886clm.h>
+   8          
+   9          void lcd_init(void);    // Init LCD
+  10          void lcd_clr(void);     // LCD Löschen 
+  11          void lcd_byte(char);      // Ausgabe unsigned char  => 3 stellig
+  12          void lcd_str(char *ptr);  // Ausgabe String
+  13          void lcd_curs(char);    // Cursor setzen
+  14          void wait_bsy1(void);     // kurz warten
+  15          void wait_bsy2(void);     // lang warten
+  16          void asc_out(char);       // Ausgabe eines ASCII Zeichens
+  17          void lcd_int(unsigned int); // Ausgabe Int Wert => 4 stellig
+  18          void send_byte(unsigned char,unsigned char);
+  19          // Anschluss des Displays an:
+  20          sbit sclk = P1_DATA^6;  // Clock Anschluss LCD
+  21          sbit sid = P1_DATA^5; // seriell Input LCD
+  22          
+  23          //******************************************************************
+  24          // Sende ein Byte zum Display, senddate ist Bytewert
+  25          // rs => Command = 0 und Data = 1
+  26          void send_byte(unsigned char senddata, unsigned char rs)
+  27          {  
+  28   1        unsigned char i;
+  29   1        unsigned long sendwert, zw;
+  30   1        zw = (unsigned long)senddata;   // Typconvertierung
+  31   1        sendwert = 0x001f + ((zw & 0xf0)<<12) + ((zw&0x0f)<<8);
+  32   1        if (rs == 1) sendwert = sendwert + 0x40;
+  33   1        for (i = 0; i<24;i++) // serielle Ausgabe von 24Bit
+  34   1        {   sclk = 0;
+  35   2          if ((sendwert & 0x00000001) == 0)sid = 0;
+  36   2          else sid = 1;
+  37   2          sclk = 1;
+  38   2          sendwert = sendwert >> 1;
+  39   2        }
+  40   1      }
+  41          void wait_bsy1(void)  // ca. 50 us warten
+  42          {      
+  43   1        unsigned int zaehler ;
+  44   1        for (zaehler = 0; zaehler < 0xaf; zaehler++);
+  45   1      }
+  46          void wait_bsy2(void)    // ca. 1.6 ms warten
+  47          {      
+  48   1        unsigned int zaehler ;
+  49   1        for (zaehler = 0; zaehler < 0xaff; zaehler++);
+  50   1      }
+  51          void lcd_init (void)
+  52          {   // P1 auf Ausgabe
+  53   1        SFR_PAGE(_pp1, noSST);      // switch to page 1
+C51 COMPILER V9.60.0.0   DIP204_XC886                                                      03/09/2024 10:32:49 PAGE 2   
+
+  54   1          P1_PUDSEL = 0xFF;           // load pullup/pulldown select register
+  55   1          P1_PUDEN = 0x00;          // load pullup/pulldown enable register
+  56   1      
+  57   1          SFR_PAGE(_pp0, noSST);      // switch to page 0
+  58   1          P1_DIR = P1_DIR | 0x60;   // load direction register  => P1.6 und P1.5 => out
+  59   1        wait_bsy2();
+  60   1        wait_bsy2();
+  61   1         // LCD Init
+  62   1        send_byte(0x34,0);      // 8 Bit Mode
+  63   1        wait_bsy2();
+  64   1        send_byte(0x09,0);      // 4 Zeilen Mode
+  65   1        wait_bsy2();
+  66   1        send_byte(0x30,0);      // 8 Bit Datenläge
+  67   1        wait_bsy2();
+  68   1        send_byte(0x0f,0);      // display ein , Cursor ein
+  69   1        wait_bsy2();
+  70   1        send_byte(0x01,0);      // clear Display
+  71   1        wait_bsy2();
+  72   1        send_byte(0x07,0);      // Cursor autoincremet
+  73   1        wait_bsy2();
+  74   1        
+  75   1      
+  76   1      }
+  77          void lcd_clr(void)
+  78          {   send_byte( 01 ,0);  // CLR Befehl
+  79   1        wait_bsy2();
+  80   1        send_byte( 0x0e ,0); // Cursor on
+  81   1        wait_bsy1();
+  82   1      }
+  83          void asc_out(unsigned char zeichen)
+  84          {
+  85   1        send_byte(zeichen,1);
+  86   1        wait_bsy1();
+  87   1        wait_bsy1();
+  88   1      }
+  89          void lcd_str(char *ptr)
+  90          { 
+  91   1        unsigned char i=0;
+  92   1        while (*ptr != 0 )
+  93   1        { 
+  94   2          asc_out(*ptr);
+  95   2            ptr++;
+  96   2            i++;
+  97   2            if (i == 20) lcd_curs(20);
+  98   2            if (i == 40) lcd_curs(40);
+  99   2            if (i == 60) lcd_curs(60);
+ 100   2        }
+ 101   1      }
+ 102          void lcd_byte(unsigned char wert)
+ 103          {
+ 104   1        unsigned char i;
+ 105   1      
+ 106   1        i = wert / 100;
+ 107   1        wert %= 100;
+ 108   1        i += 0x30;
+ 109   1        asc_out(i);
+ 110   1        i = wert / 10;
+ 111   1        wert %= 10 ;
+ 112   1        i += 0x30;
+ 113   1        asc_out(i);
+ 114   1        wert += 0x30;
+ 115   1        asc_out(wert);
+C51 COMPILER V9.60.0.0   DIP204_XC886                                                      03/09/2024 10:32:49 PAGE 3   
+
+ 116   1      }
+ 117          void lcd_int(unsigned int wert_16)
+ 118          { // Ausgabe von 0 bis 9999 !!!!
+ 119   1        unsigned char i;
+ 120   1        
+ 121   1        i = wert_16 / 1000; // Anzahl 1000er
+ 122   1        wert_16 %= 1000;  // Rest nach 1000er Division
+ 123   1        asc_out(i+0x30);    // Ausgabe als ASCII Zeichen
+ 124   1          i= wert_16 / 100;
+ 125   1        wert_16 %= 100;
+ 126   1        asc_out(i+0x30);
+ 127   1        i = wert_16 / 10;
+ 128   1        wert_16 %= 10;
+ 129   1          asc_out(i+0x30);
+ 130   1        wert_16 += 0x30;
+ 131   1        asc_out((char)wert_16);
+ 132   1      }
+ 133          void lcd_curs(unsigned char pos)
+ 134          {
+ 135   1        pos %=80;
+ 136   1        if ( pos < 20)  send_byte( pos +0x80 ,0);  // 1. Zeile 
+ 137   1        if (( pos >= 20) && (pos < 40))send_byte( pos -20 + 0x20 + 0x80 ,0);
+ 138   1        if (( pos >= 40) && (pos < 60))send_byte( pos -40 + 0x40 + 0x80 ,0);
+ 139   1        if (( pos >= 60) && (pos < 80))send_byte( pos -60 + 0x60 + 0x80 ,0);  
+ 140   1        
+ 141   1        wait_bsy1();
+ 142   1        wait_bsy1();    
+ 143   1      }
+ 144          
+ 145          
+ 146            
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    682    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      18
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
