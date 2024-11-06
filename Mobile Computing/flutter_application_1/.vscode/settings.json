@@ -1,0 +1,7 @@
+{
+    "sqltools.connections": [],
+    "dataworkspace.excludedProjects": [
+        "mobilecomputing/mobilecomputing.sqlproj"
+    ],
+    "cmake.ignoreCMakeListsMissing": true
+}
