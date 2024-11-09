@@ -1,0 +1,101 @@
+\lstloadlanguages{PHP,Python,Java,C,C++,bash,[Sharp]C,HTML} %weitere Sprachen: http://texdoc.net/texmf-dist/doc/latex/listings/listings.pdf auf Seite 13
+\lstdefinestyle{Csharp} {language=[Sharp]C} %[] kann in listingdefinition nicht verwendet werden
+\lstdefinelanguage{JavaScript}{
+  keywords={typeof, new, true, false, catch, function, return, null, catch, switch, var, if, in, while, do, else, case, break, script, type},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={class, export, boolean, throw, implements, import, this},
+  ndkeywordstyle=\color{darkgray}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=false,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{purple}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  %morestring=[b]"
+}
+
+
+\lstdefinelanguage{Gherkin}{
+	morekeywords = {
+		Given,
+		When,
+		Then,
+		And,
+		Scenario,
+		Feature,
+    But,
+    but,
+		Background,
+		Scenario Outline,
+    Examples,
+    Example,
+    Rule
+	},
+	sensitive=true,
+	morecomment=[l]{\#},
+	morestring=[b]",
+	morestring=[b]'
+}
+
+\definecolor{gray}{rgb}{0.4,0.4,0.4}
+\definecolor{darkblue}{rgb}{0.0,0.0,0.6}
+\definecolor{cyan}{rgb}{0.0,0.6,0.6}
+
+\lstdefinelanguage{XML}
+{
+  morestring=[b]",
+  morestring=[s]{>}{<},
+  morecomment=[s]{<?}{?>},
+  stringstyle=\color{black},
+  identifierstyle=\color{darkblue},
+  keywordstyle=\color{cyan},
+  morekeywords={xmlns,version,type}% list your attributes here
+}
+
+\lstdefinelanguage{CS}{
+  keywords=[1]{typeof, new, true, false, catch, function, return, null, catch, switch, var, if, in, while, do, else, case, break, script, type, public, private, class, interface, int, string, bool, this, throw, foreach, for, static, extern,void,object, float, double, ref, out,using,get,set,value,lock,long,struct,protected,uint,byte},
+  keywordstyle=[1]\color{VSblue},   
+  keywords=[2]{IMediator,T,Action,Mediator,DllImport,SafeFileHandle,MarshalAs,UnmanagedType,FileAccess, FileShare,FileMode,FileAttributes,Optional,IntPtr,NativeMethods,CharSet,DataCommand,Task,Array,TimeSpan,Exception,Debug,ModelStatusEventArgs,Marshal, ManagementObjectSearcher,List,USBDeviceInfo,ManagementObjectCollection,AutoResetEvent,USBModel,StatusEventHandler,Stopwatch,ModelData,IObjectManager,Tkey,Tvalue,Dictionary,IModelControl,ObservableCollection,App,DateTime,ResourceDictionary,Application,Thread,DataMember,IgnoreDataMember,DataContract,MeasurementData,DynamicMeasurement,Dynamic,XmlIgnore,FileStream,XmlSerializer,DataContractJsonSerializer,Console,XmlSerializer,Timer,ByteBuffer},
+  keywordstyle=[2]\color{VSclassGreen}, 
+  identifierstyle=\color{VSblack},
+  sensitive=true,
+  captionpos=b,     % sets the caption-position to bottom
+  breaklines=true,    % Zeilen umbrechen wenn notwendig.
+  breakautoindent=true, % Nach dem Zeilenumbruch Zeile einrücken.
+  tabsize=2,        % Tabulatorgrösse 2
+  basicstyle=\ttfamily\footnotesize, % Nichtproportionale Schrift, klein für den Quellcode
+  extendedchars=true,   % Alle Zeichen vom Latin1 Zeichensatz anzeigen.
+  numbers=left,     % Zeilennummern links
+  stepnumber=1,     % Jede Zeile nummerieren.
+  numberstyle=\tiny,    % Zeichengrösse 'tiny' für die Nummern.
+  frame=single,     % Rahmen an
+  frameround=ffff,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{VSgreencomments}\ttfamily,
+  stringstyle=\color{VSstringred}\ttfamily,
+  morestring=[b]"
+  %morestring=[b]',"
+}
+
+\lstdefinelanguage{XAML}
+{
+  basicstyle=\ttfamily\footnotesize,
+  morestring=[b]",
+  %moredelim=[s][\color{blue}]{<}{>},
+  morecomment=[s]{<?}{?>},
+  morecomment=[s]{<!--}{-->},
+  commentstyle=\color{VSgreencomments},
+  moredelim=[s][\color{blue}]{/>}{</},
+  stringstyle=\color{VSstringred},
+  identifierstyle=\color{blue},
+  keywordstyle=\color{VSclassGreen},
+  numbers=left,
+  tabsize=2,
+  frame=single,
+  rulecolor=\color{black},
+  breaklines=true,
+  captionpos=b,
+  morekeywords={xmlns, version, type, Algorithm, URI, Id, Target}% list your attributes here
+}

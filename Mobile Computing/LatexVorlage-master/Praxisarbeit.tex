@@ -1,0 +1,73 @@
+\documentclass[
+	12pt, % Schriftgröße
+	DIV=10,
+	ngerman, %für Umlaute, Silbnetrennung etc.
+	a4paper, % Papierformat
+	oneside, % einseitiges Dokument
+	titlepage, % es wird eine Titelseite verwendet
+	parskip=half, % Abstand zwischen Absätzen (halbe Zeile)
+	BCOR=10mm,		% Bindekorrektur links: 10mm
+	%headings=normal, % Größe der Überschriften verkleinern
+	listof=totoc, % Verzeichnisse im Inhaltsverzeichnis aufführen
+	listof=entryprefix, % enable prefix for toc entries, e.g. "Abb. "
+	bibliography=totoc, % Literaturverzeichnis im Inhaltsverzeichnis aufführen
+	index=totoc, % Index im Inhaltsverzeichnis aufführen
+	%captions=tableheading, % place table captions above table
+	final, % Status des Dokuments (final/draft)
+	hidelinks, %entfernt hässliche Boxen
+	numbers=noenddot, % entfernt Punkte hinter Kapitelzahlen
+	hyphens,
+	]{scrreprt}%{scrartcl}
+
+\input{settings/Einstellungen}
+\input{settings/header}
+\input{settings/Programmiersprachen}
+\input{settings/Abkuerzungen.tex}
+
+
+\begin{document}
+
+	\sloppy
+	\pagenumbering{Roman}
+
+	\input{settings/Deckblatt}
+	\input{settings/Ehrwoertliche_Erklaerung}
+	\pagebreak
+	\input{content/Abstract.tex}
+	%\include{content/IEEE} % IEEE disclaimer - use with IEEE sources
+	%\input{content/Zusammenfassung}
+	\pagebreak
+
+
+	% content lists
+	\tableofcontents
+	\listoffigures
+	\listoftables
+	\printacronyms
+	\listofequations 
+	%\lstlistoflistings % list of source code
+	\pagebreak
+
+	\pagenumbering{arabic} % start page numbering in arabic
+
+	\input{content/AufbauDerSoftwareentwicklung.tex}
+	\input{content/BugsUndRevision.tex}
+	\input{content/Testing.tex}
+
+
+	\input{content/BenötigteSoftware.tex}
+	\input{content/BenutzerBedienung.tex}
+
+
+	\input{content/Schluss}
+
+	
+	\renewcommand{\refname}{Literaturverzeichnis}
+	%Literaturverzeichnis einfügen
+	\printbibliography
+%	\pagebreak
+	\appendix
+	\input{content/Anhang}
+
+
+\end{document}

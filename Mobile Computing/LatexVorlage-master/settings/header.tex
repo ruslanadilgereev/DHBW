@@ -1,0 +1,305 @@
+% Include from Einstellungen.tex
+\title{\titel}
+\author{\autor}
+%\date{\today} % set date for default title page (\maketitle) -- not used with custom title page
+
+\usepackage[english, main=ngerman]{babel} % set language -- ngerman is default, english needed for acro
+
+\usepackage{scrhack} % improves compatibility with KOMA
+
+% handle encoding
+\usepackage[T1]{fontenc} % use 256-glyph font (e.g. makes "ü" a glyph) enables copy-pasting of umlauts
+\usepackage[utf8]{inputenc} % allow all UTF-8 characters in source
+
+% page geometry
+\usepackage[left=2.50cm, right=2.50cm, top=2.50cm, bottom=3.10cm]{geometry}	% define margins
+\usepackage{pdflscape} % allow landscape pages
+\renewcommand*{\chapterheadstartvskip}{\vspace*{.7\baselineskip}}% reduce chapter headings margin
+\setcounter{secnumdepth}{3} % number subsubsections
+\setcounter{tocdepth}{2} %subsections im toc anzeigen
+\setuptoc{toc}{totoc} % add toc to toc
+
+\usepackage[onehalfspacing]{setspace} % line spacing 1.5
+\usepackage{microtype} % improve typesetting -> avoid over- / underfull boxes
+\usepackage{textcomp} % defines additional symbols (see: https://ctan.org/pkg/textcomp ??)
+% Hurenkinder und Schusterjungen verhindern
+% http://projekte.dante.de/DanteFAQ/Silbentrennung -- link deprecated!
+\clubpenalty = 10000 % schließt Schusterjungen aus (Seitenumbruch nach der ersten Zeile eines neuen Absatzes)
+\widowpenalty = 10000 % schließt Hurenkinder aus (die letzte Zeile eines Absatzes steht auf einer neuen Seite)
+\displaywidowpenalty=10000
+
+
+% Font
+\usepackage{noto}
+%\usepackage[scaled]{helvet}
+%\usepackage{lmodern}
+
+\usepackage{etoolbox} %Untersützt ifstrempty
+
+% footnotes
+\usepackage{chngcntr} 
+\counterwithout{footnote}{chapter} % make footnotes not reset at the beginning of a chapter
+\renewcommand{\thempfootnote}{\arabic{mpfootnote}} % number footnotes
+\usepackage[perpage, hang, multiple, stable]{footmisc} % add footnote stuff
+
+\usepackage{afterpage} % allows control over float placement (see: https://www.ctan.org/pkg/afterpage)
+
+
+% math support
+\usepackage{amsmath} % math macros like \hat
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+% units
+\usepackage[locale=DE]{siunitx} % adds \qty and \unit
+\DeclareSIUnit[qualifier-mode=combine]\dBm{\dB\of{m}}
+
+
+\usepackage{lipsum} % Dummytext
+\usepackage{blindtext}
+\blindmathtrue
+
+ % colors
+ \usepackage{color, colortbl}
+ %Farbdefinition von hellgrau
+ \definecolor{light-gray}{gray}{0.75}
+ \definecolor{lightgray}{rgb}{.9,.9,.9}
+ \definecolor{darkgray}{rgb}{.4,.4,.4}
+ \definecolor{purple}{rgb}{0.65, 0.12, 0.82}
+ \definecolor{darkgreen}{RGB}{0, 238, 0}
+ \definecolor{blue}{RGB}{44, 111, 235}
+ %%%VISUAL STUDIO COLORS
+ \definecolor{VSblue}{RGB}{44, 111, 235}
+ \definecolor{VSstringred}{RGB}{163, 21, 21}
+ \definecolor{VScitrine}{rgb}{0.89, 0.82, 0.04}
+ \definecolor{VSblack}{rgb}{0.0, 0.0, 0.0}
+ \definecolor{VSgreencomments}{rgb}{0,0.5,0}
+ \definecolor{VSclassGreen}{RGB}{0, 125, 154}
+ 
+ \usepackage[dvipsnames,table,xcdraw]{xcolor} % needs to be loaded before pgfplots!
+
+
+%floats
+\usepackage{float}
+\addto\extrasngerman{\let\subsectionautorefname\sectionautorefname 	\let\subsubsectionautorefname\sectionautorefname} %Displays sub- and subsubsection as section in \autoref
+
+
+\usepackage[
+	%format=hang, justification=justified,									% format option 1: indented text,	label normal,	separated with colon,	justification
+	format=plain, justification=justified, labelfont=bf, labelsep=quad, 	% format option 2: no indents,		label bold,		separated with tab,		justification
+	singlelinecheck=true % center captions if they fit into a single line 
+	]{caption}
+\usepackage{subcaption} % adds caption support for subfigures
+%\captionsetup[table]{position=above, aboveskip=4pt}%, belowskip=6pt} % should place the caption of tables above the table. Does not work!
+
+%tables
+\usepackage{booktabs} % make nice tables
+\usepackage{multirow}
+\usepackage{tabularx} % add support for line wrapping in tabels
+
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{L}{>{$}l<{$}} % math-mode version of "l" column type
+
+\renewcommand{\arraystretch}{2}
+\setlength{\tabcolsep}{5mm}
+\usepackage{array}% in the preamble
+
+%figures
+\usepackage[pdftex]{graphicx}		
+\graphicspath{{img/}}
+\usepackage{wrapfig} % allow placement of figures in text (wrap text around figure)
+
+\usepackage{flafter} % make sure figures are placed after declaration
+
+% TikZ/PGF
+
+\usepackage{tikz}
+\usepackage{pgffor} % foreach loops
+\usepackage{pgfplots}
+\usepackage{circuitikz}
+
+% externalize pgf plots
+\usepgfplotslibrary{external}
+\tikzexternalize
+\pgfplotsset{
+	width=15cm,
+	compat=1.18,
+	/pgf/number format/.cd,
+	use comma,
+	1000 sep={ }
+}
+
+
+
+\usepackage{tcolorbox} % makes colorful boxes (for examples and such)
+
+% listings
+\usepackage{listings}
+\usepackage{listings-ext}
+\lstset{%
+	%language=[Sharp]C,			% Standardsprache des Quellcodes
+	%backgroundcolor=\color{lightgray}, %Hintergrundfarbe von CODE
+	numbers=left,			% Zeilennummern links
+	stepnumber=1,			% Jede Zeile nummerieren.
+	numbersep=5pt,			% 5pt Abstand zum Quellcode
+	numberstyle=\tiny,		% Zeichengrösse 'tiny' für die Nummern.
+	breaklines=true,		% Zeilen umbrechen wenn notwendig.
+	breakautoindent=true,	% Nach dem Zeilenumbruch Zeile einrücken.
+	postbreak=\space,		% Bei Leerzeichen umbrechen.
+	tabsize=2,				% Tabulatorgrösse 2
+	basicstyle=\ttfamily\footnotesize, % Nichtproportionale Schrift, klein für den Quellcode
+	showspaces=false,		% Leerzeichen nicht anzeigen.
+	showstringspaces=false,	% Leerzeichen auch in Strings ('') nicht anzeigen.
+	extendedchars=true,		% Alle Zeichen vom Latin1 Zeichensatz anzeigen.
+	captionpos=b,			% sets the caption-position to bottom
+	%backgroundcolor=\color{ListingBackground}, % Hintergrundfarbe des Quellcodes setzen.
+	xleftmargin=0pt,		% Rand links
+	xrightmargin=0pt,		% Rand rechts
+	frame=single,			% Rahmen an
+	frameround=ffff,
+	rulecolor=\color{darkgray},	% Rahmenfarbe
+	%fillcolor=\color{ListingBackground},
+	keywordstyle=\color[rgb]{0.133,0.133,0.6},
+	commentstyle=\color[rgb]{0.133,0.545,0.133},
+	stringstyle=\color[rgb]{0.627,0.126,0.941}
+} % uses textcomp
+\renewcommand\lstlistingname{Codeausschnitt}
+\renewcommand\lstlistlistingname{Quellcodeverzeichnis}
+
+%Umlaute und Sonderzeichen im listings erlauben
+\lstset{literate=%
+	{Ö}{{\"O}}1
+	{Ä}{{\"A}}1
+	{Ü}{{\"U}}1
+	{ß}{{\ss}}2
+	{ü}{{\"u}}1
+	{ä}{{\"a}}1
+	{ö}{{\"o}}1
+	{&}{{\&}}1
+}
+
+
+\usepackage{enumitem} % allows control about enumeration format
+
+% acronyms
+\usepackage{acro}
+
+\NewAcroTemplate{shortLong}{%
+	\acroiffirstTF{%
+		\acrowrite{short}%
+		#2%
+		\acspace%
+		(\ifstrempty{#2}{}{\acrowrite{short}: }%
+		\acroifT{foreign}{\acrowrite{foreign}, }%
+		\acrowrite{long}%
+		\acroifT{alt}{ \acrotranslate{or} \acrowrite{alt}})%
+	}%
+	{\acrowrite{short}#2}%
+}
+
+\RenewAcroCommand\ac{m O{}}{\UseAcroTemplate{shortLong}[2]{#1}{#2}}
+\RenewAcroCommand\acp{m O{}}{\acroplural\UseAcroTemplate{shortLong}[2]{#1}{#2}}
+\RenewAcroCommand\iac{m O{}}{\acroindefinite\UseAcroTemplate{shortLong}[2]{#1}{#2}}
+\RenewAcroCommand\Ac{m O{}}{\acroupper\UseAcroTemplate{shortLong}[2]{#1}{#2}}
+\RenewAcroCommand\Acp{m O{}}{\acroplural\acroupper\UseAcroTemplate{shortLong}[2]{#1}{#2}}
+\RenewAcroCommand\Iac{m O{}}{\acroupper\acroindefinite\UseAcroTemplate{shortLong}[2]{#1}{#2}}
+
+\acsetup{
+	first-style=shortLong,
+	trailing/activate={dash}, 
+	make-links=true,
+	list/heading=addchap, % format table of acronyms (toa) as chapter* and add tot toc (\addchap of KOMA)
+	list/name= {Abkürzungsverzeichnis} % make table-of-commands style uniform
+}
+
+
+%bibliography
+\usepackage[style=ieee, %authortitle, %Zitierstil
+	bibstyle=ieee, %authortitle,
+	language=ngerman, %Quellen auf Deutsch
+	hyperref=true, %Anklickbare Referenzen
+	natbib=true, 
+	backend=biber, 
+	pagetracker=true, %ebd. bei wiederholten Angaben
+	bibencoding=utf8,
+	backrefstyle=three+, % fasst Seiten zusammen, z. B S. 2f, 6ff, 7-10
+	date=short, %Datumsformat
+	bibwarn=true]{biblatex}
+
+\renewcommand*{\labelalphaothers}{\textsuperscript{+}} % handle multiple authors
+	
+\usepackage[babel,german=guillemets]{csquotes} % select quotes for bibliography
+\setlength{\bibitemsep}{1em}     % Abstand zwischen den Literaturangaben
+\setlength{\bibhang}{2em}        % Einzug nach jeweils erster Zeile
+% include bib files (configured in Einstellungen.tex)
+\ladeliteratur
+
+\setcounter{biburllcpenalty}{7000}
+\setcounter{biburlucpenalty}{8000}
+
+				
+% kopf und fußzeile
+\usepackage[headsepline, footsepline, plainheadsepline, plainfootsepline]{scrlayer-scrpage}		% linie aktivieren für "headings" und "plain" seiten
+\automark{chapter}		% aktivieren das "chapter" und "section" oeben angezeigt werden kann
+\automark*{section}
+
+\setlength{\headheight}{35pt}			% header abstand
+\setlength{\footheight}{\baselineskip}	% footer abstand
+
+\clearpairofpagestyles
+
+% Der "*" macht, dass hier konfigurierte Einstellungen auch für "plain"-Seiten gelten
+%\ihead*{\vspace*{-0.0cm}\includegraphics[height=1cm, width=0.3\textwidth, keepaspectratio, angle=0]{\firmenlogo}}	% firmenlogo etwas runtersetzen, da komisch formatiert
+\chead{\normalfont \headmark}		% "chapter" und "section" oben mittig anzeigen
+\ohead*{\includegraphics[height=2cm, angle=0]{img/dhbwlogo.jpg}}	% DHBW Logo
+
+\ifoot*{\scriptsize \normalfont Autor: \autor}	% \scriptsize -> kleine Schriftgröße      \normalfont -> Nicht Kursiv
+\cfoot*{\scriptsize \normalfont Datum: \today}  % Autor Links, Datum mitte, Seitenzahl rechts
+\ofoot{\pagemark}
+
+\renewcommand*{\chapterpagestyle}{headings}		% pagestyle von der ersten seite eines kapitels ändern
+\renewcommand*{\titlepagestyle}{plain}		% pagestyle von der titelseite ändern (funktioniert hier nicht, da kein "richtiger" titel nach koma-skript gesetzt wird)
+
+\renewcaptionname{ngerman}{\bibname}{Literaturverzeichnis} % change name of bibliography
+
+% Formelverzeichniss
+\DeclareNewTOC[
+	tocentryindent=0pt,
+    tocentrynumwidth=2em,
+	type=equation,
+	name={Gl.},
+	types=equations,
+	listname={Formelverzeichnis},
+]{equ}
+\newcommand{\addequations}[2][\theequation]{%
+	\addxcontentsline{equ}{equation}[{#1}]{\kern 1em #2}%
+}
+
+
+\usepackage{url} % hyphenate urls - needs to be loaded before hyperref-package!
+\usepackage{bookmark} %nur ein latex-Durchlauf für die Aktualisierung von Verzeichnissen nötig
+
+% allow hyper links in pdf
+\usepackage{hyperref}
+\hypersetup{
+	pdftitle={\titel},
+	pdfauthor={\autor},
+	pdfsubject={\art},
+	pdfcreator={pdflatex, LaTeX with KOMA-Script},
+	pdfpagemode=UseOutlines, 		% Beim Oeffnen Inhaltsverzeichnis anzeigen
+	pdfdisplaydoctitle=true, % Dokumenttitel statt Dateiname anzeigen.
+	breaklinks=true		
+}
+
+
+
+\newenvironment{symboltable}{
+	\par
+	\let\stretchbuf\arraystretch
+	\renewcommand{\arraystretch}{1}
+	\tabularx{\textwidth}{rX}
+}{
+	\endtabularx
+	\renewcommand{\arraystretch}{\stretchbuf}
+	\par
+}
