@@ -6,6 +6,7 @@ import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/registration_screen.dart'; // Importiere die RegistrationScreen
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() {
   runApp(
@@ -13,7 +14,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
       ],
-      child: TrainingCalendarApp(),
+      child: const TrainingCalendarApp(),
     ),
   );
 }
@@ -28,10 +29,19 @@ class TrainingCalendarApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
+      // Füge die Lokalisierungsdelegates und unterstützten Sprachen hinzu
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('de', 'DE'), // Deutsch
+      ],
       initialRoute: '/',
       routes: {
-        '/': (context) => AuthWrapper(),
-        '/register': (context) => RegistrationScreen(),
+        '/': (context) => const AuthWrapper(),
+        '/register': (context) => const RegistrationScreen(),
       },
     );
   }
@@ -45,9 +55,9 @@ class AuthWrapper extends StatelessWidget {
     return Consumer<AuthService>(
       builder: (context, authService, _) {
         if (authService.isAuthenticated) {
-          return HomeScreen();
+          return HomeScreen(); // Entferne 'const' hier
         } else {
-          return LoginScreen();
+          return LoginScreen(); // Entferne 'const' hier
         }
       },
     );

@@ -5,14 +5,14 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const mysql = require('mysql2/promise');
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 // Load environment variables from .env file
 dotenv.config();
 
 // Definiere die CORS-Optionen
 const corsOptions = {
-  origin: "localhost:3000", // Ersetze 8080 durch den Port, auf dem deine Flutter-App läuft
+  origin: 'http://localhost:3000', // Ersetze 8080 durch den Port, auf dem deine Flutter-App läuft
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
@@ -24,7 +24,8 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // Middleware
-app.use(express.json({ type: ['application/json', 'text/plain'] }));
+//app.use(express.json({ type: ['application/json', 'text/plain'] }));
+app.use(express.json());
 
 
 // Create a MySQL pool

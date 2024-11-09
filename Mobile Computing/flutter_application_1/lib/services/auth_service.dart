@@ -16,7 +16,7 @@ class AuthService extends ChangeNotifier {
   int get userId => _userId;
 
   Future<void> login(String email, String password) async {
-    final url = Uri.parse('http://localhost:3000/api/login');
+    final url = Uri.parse('http://localhost:3001/api/login');
 
     try {
       final response = await http.post(
@@ -76,8 +76,8 @@ class AuthService extends ChangeNotifier {
   }
 
 Future<void> register(String email, String password, String role) async {
-  final url = Uri.parse('http://localhost:3000/api/register');
-  print(url);
+  final url = Uri.parse('http://localhost:3001/api/register');
+  
   final response = await http.post(
     url,
     headers: {'Content-Type': 'application/json'},
@@ -87,7 +87,7 @@ Future<void> register(String email, String password, String role) async {
       'role': role,
     }),
   );
-
+  print(response.body);
   if (response.statusCode == 201) {
     // Registrierung erfolgreich
     // Sie können hier zusätzliche Aktionen durchführen

@@ -46,7 +46,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   }
 
   Future<void> _fetchTrainings() async {
-    final url = Uri.parse('http://localhost:3000/api/trainings'); 
+    final url = Uri.parse('http://localhost:3001/api/trainings'); 
 
     try {
       print("Fetching trainings from backend...");
