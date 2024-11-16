@@ -49,33 +49,60 @@ app.get('/', (req, res) => {
 // Get all trainings
 app.get('/api/trainings', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, date, training_name FROM trainings');
-    res.json(rows);
+    const [trainings] = await pool.query(
+      'SELECT t.id, t.training_name, ' +
+      'GROUP_CONCAT(DISTINCT td.date ORDER BY td.date ASC) AS dates ' +
+      'FROM trainings t ' +
+      'LEFT JOIN training_dates td ON t.id = td.training_id ' +
+      'GROUP BY t.id'
+    );
+
+    res.json(
+      trainings.map((training) => ({
+        ...training,
+        dates: training.dates ? training.dates.split(',') : [],
+      }))
+    );
   } catch (error) {
     console.error('Error fetching trainings:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-// Add a new training
-app.post('/api/trainings', async (req, res) => {
-  const { date, training_name } = req.body;
 
-  if (!date || !training_name) {
-    return res.status(400).json({ error: 'Missing required fields' });
+app.post('/api/trainings', async (req, res) => {
+  const { training_name, dates } = req.body;
+
+  if (!training_name || !Array.isArray(dates) || dates.length === 0) {
+    return res.status(400).json({ error: 'Missing required fields or invalid format' });
   }
 
   try {
-    const [result] = await pool.query(
-      'INSERT INTO trainings (date, training_name) VALUES (?, ?)',
-      [date, training_name]
+    // Training einfügen
+    const [trainingResult] = await pool.query(
+      'INSERT INTO trainings (training_name) VALUES (?)',
+      [training_name]
     );
-    res.status(201).json({ message: 'Training added', id: result.insertId });
+    const trainingId = trainingResult.insertId;
+
+    // Termine einfügen
+    const dateValues = dates.map((date) => [trainingId, date]);
+    if (dateValues.length > 0) {
+      await pool.query(
+        'INSERT INTO training_dates (training_id, date) VALUES ?',
+        [dateValues]
+      );
+    }
+
+    res.status(201).json({ message: 'Training added successfully', id: trainingId });
   } catch (error) {
     console.error('Error adding training:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 });
+
+
+
 
 // Update a training by ID
 app.put('/api/trainings/:id', async (req, res) => {
@@ -104,6 +131,10 @@ app.delete('/api/trainings/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
+    // Clear references to the training in the bookings table
+    await pool.query('UPDATE bookings SET training_id = NULL WHERE training_id = ?', [id]);
+
+    // Delete the training
     const [result] = await pool.query('DELETE FROM trainings WHERE id = ?', [id]);
 
     if (result.affectedRows === 0) {
@@ -116,6 +147,8 @@ app.delete('/api/trainings/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
 
 // Benutzer registrieren
 
@@ -200,7 +233,7 @@ app.post('/api/bookings', async (req, res) => {
   }
 
   try {
-    // Check if the booking already exists
+    // Überprüfung auf bestehende Buchung
     const [existingBooking] = await pool.query(
       'SELECT id FROM bookings WHERE user_id = ? AND training_id = ?',
       [user_id, training_id]
@@ -210,17 +243,19 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ error: 'You have already booked this training' });
     }
 
-    // Create the booking
+    // Buchung erstellen
     await pool.query(
       'INSERT INTO bookings (user_id, training_id) VALUES (?, ?)',
       [user_id, training_id]
     );
-    res.status(201).json({ message: 'Training booked' });
+
+    res.status(201).json({ message: 'Training booked successfully' });
   } catch (error) {
     console.error('Error booking training:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
 
 
 // Get bookings for a specific training
@@ -237,6 +272,26 @@ app.get('/api/trainings/:id/bookings', async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error('Error fetching bookings:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+app.get('/api/trainings', async (req, res) => {
+  try {
+    const [trainings] = await pool.query(
+      'SELECT t.id, t.training_name, GROUP_CONCAT(td.date ORDER BY td.date ASC) AS dates ' +
+      'FROM trainings t ' +
+      'LEFT JOIN training_dates td ON t.id = td.training_id ' +
+      'GROUP BY t.id'
+    );
+
+    res.json(trainings.map((training) => ({
+      ...training,
+      dates: training.dates ? training.dates.split(',') : [],
+    })));
+  } catch (error) {
+    console.error('Error fetching trainings:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

@@ -27,8 +27,8 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       body: role == 'anbieter'
-          ? ManageTrainingsPage()
-          : TrainingCalendarPage(),
+          ? const ManageTrainingsPage()
+          : const TrainingCalendarPage(),
     );
   }
 }
