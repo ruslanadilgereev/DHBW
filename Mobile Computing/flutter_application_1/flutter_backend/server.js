@@ -190,6 +190,58 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+
+// Create a booking
+app.post('/api/bookings', async (req, res) => {
+  const { user_id, training_id } = req.body;
+
+  if (!user_id || !training_id) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    // Check if the booking already exists
+    const [existingBooking] = await pool.query(
+      'SELECT id FROM bookings WHERE user_id = ? AND training_id = ?',
+      [user_id, training_id]
+    );
+
+    if (existingBooking.length > 0) {
+      return res.status(400).json({ error: 'You have already booked this training' });
+    }
+
+    // Create the booking
+    await pool.query(
+      'INSERT INTO bookings (user_id, training_id) VALUES (?, ?)',
+      [user_id, training_id]
+    );
+    res.status(201).json({ message: 'Training booked' });
+  } catch (error) {
+    console.error('Error booking training:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+// Get bookings for a specific training
+app.get('/api/trainings/:id/bookings', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT bookings.id, users.email AS user_email
+      FROM bookings
+      JOIN users ON bookings.user_id = users.id
+      WHERE bookings.training_id = ?`,
+      [id]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

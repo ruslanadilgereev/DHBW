@@ -1,27 +1,9 @@
-// screens/training_calendar_page.dart
-// (Dieser Code entspricht weitgehend deinem bestehenden Code, mit einigen Verbesserungen)
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:intl/intl.dart';
-
-void main() => runApp(TrainingCalendarApp());
-
-class TrainingCalendarApp extends StatelessWidget {
-  const TrainingCalendarApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Training Calendar',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: TrainingCalendarPage(),
-    );
-  }
-}
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 
 class TrainingCalendarPage extends StatefulWidget {
   const TrainingCalendarPage({super.key});
@@ -33,7 +15,7 @@ class TrainingCalendarPage extends StatefulWidget {
 class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   DateTime _selectedDay = DateTime.now();
   DateTime _focusedDay = DateTime.now();
-  final Map<DateTime, List<String>> _trainings = {};
+  final Map<DateTime, List<Map<String, dynamic>>> _trainings = {};
 
   @override
   void initState() {
@@ -49,7 +31,6 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     final url = Uri.parse('http://localhost:3001/api/trainings'); 
 
     try {
-      print("Fetching trainings from backend...");
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -60,11 +41,12 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
             DateTime rawDate = DateTime.parse(item['date']).toLocal();
             final trainingDate = _normalizeDate(rawDate);
             final trainingName = item['training_name'].toString();
-            _trainings.putIfAbsent(trainingDate, () => []).add(trainingName);
-            print('Added training: $trainingName on $trainingDate');
+            final trainingId = item['id'];
+            final trainingInfo = {'id': trainingId, 'name': trainingName};
+
+            _trainings.putIfAbsent(trainingDate, () => []).add(trainingInfo);
           }
         });
-        print("Trainings fetched successfully.");
       } else {
         print('Failed to load trainings: ${response.statusCode}');
       }
@@ -73,14 +55,42 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     }
   }
 
-  void _bookTraining(String trainingName) {
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Training "$trainingName" gebucht!')),
-    );
+  void _bookTraining(int trainingId, String trainingName) async {
+    int userId = Provider.of<AuthService>(context, listen: false).userId;
+
+    final url = Uri.parse('http://localhost:3001/api/bookings');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': userId,
+          'training_id': trainingId,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Training "$trainingName" gebucht!')),
+        );
+      } else {
+        final data = json.decode(response.body);
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['error'] ?? 'Fehler beim Buchen des Trainings')),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler beim Buchen des Trainings: $e')),
+      );
+    }
   }
 
-  void _showBookingDialog(String trainingName) {
+  void _showBookingDialog(int trainingId, String trainingName) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -92,7 +102,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
             child: const Text('Abbrechen'),
           ),
           TextButton(
-            onPressed: () => _bookTraining(trainingName),
+            onPressed: () => _bookTraining(trainingId, trainingName),
             child: const Text('Buchen'),
           ),
         ],
@@ -102,7 +112,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
 
   @override
   Widget build(BuildContext context) {
-    List<String> trainingsForSelectedDay =
+    List<Map<String, dynamic>> trainingsForSelectedDay =
         _trainings[_normalizeDate(_selectedDay)] ?? [];
 
     return Scaffold(
@@ -122,12 +132,12 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
             onDaySelected: (selectedDay, focusedDay) {
               setState(() {
                 _selectedDay = selectedDay;
-                _focusedDay = focusedDay; // update `_focusedDay` here as well
+                _focusedDay = focusedDay;
               });
             },
             eventLoader: (day) {
               final normalizedDay = _normalizeDate(day);
-              return _trainings[normalizedDay] ?? [];
+              return _trainings[normalizedDay]?.map((e) => e['name']).toList() ?? [];
             },
             calendarBuilders: CalendarBuilders(
               markerBuilder: (context, date, events) {
@@ -155,12 +165,14 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                 : ListView.builder(
                     itemCount: trainingsForSelectedDay.length,
                     itemBuilder: (context, index) {
-                      String trainingName = trainingsForSelectedDay[index];
+                      Map<String, dynamic> training = trainingsForSelectedDay[index];
+                      String trainingName = training['name'];
+                      int trainingId = training['id'];
                       return ListTile(
                         title: Text(trainingName),
                         trailing: ElevatedButton(
                           child: const Text('Buchen'),
-                          onPressed: () => _showBookingDialog(trainingName),
+                          onPressed: () => _showBookingDialog(trainingId, trainingName),
                         ),
                       );
                     },

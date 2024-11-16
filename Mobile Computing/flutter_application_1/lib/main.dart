@@ -55,7 +55,7 @@ class AuthWrapper extends StatelessWidget {
     return Consumer<AuthService>(
       builder: (context, authService, _) {
         if (authService.isAuthenticated) {
-          return HomeScreen(); // Entferne 'const' hier
+          return const HomeScreen(); // Entferne 'const' hier
         } else {
           return LoginScreen(); // Entferne 'const' hier
         }
