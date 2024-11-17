@@ -19,6 +19,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   DateTime _selectedDay = DateTime.now();
   DateTime _focusedDay = DateTime.now();
   final Map<DateTime, List<Map<String, dynamic>>> _trainings = {};
+  List<int> _userBookedTrainingIds = [];
 
   CalendarView _currentView = CalendarView.Monat;
   int _currentYear = DateTime.now().year;
@@ -27,6 +28,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   void initState() {
     super.initState();
     _fetchTrainings();
+    _fetchUserBookings();
   }
 
   DateTime _normalizeDate(DateTime date) {
@@ -44,9 +46,19 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
         setState(() {
           _trainings.clear();
           for (var item in data) {
-            final trainingName = item['training_name'].toString();
+            final trainingName = item['training_name'] ?? item['titel'] ?? 'Unbenannte Schulung';
             final trainingId = item['id'];
-            final trainingInfo = {'id': trainingId, 'name': trainingName};
+
+            // Zusätzliche Informationen abrufen
+            final trainingInfo = {
+              'id': trainingId,
+              'name': trainingName,
+              'description': item['beschreibung'] ?? 'Keine Beschreibung',
+              'location': item['ort'] ?? 'Kein Ort angegeben',
+              'maxParticipants': item['max_teilnehmer'] ?? 0,
+              'lecturerId': item['dozent_id'] ?? 'Keine Angabe',
+              'bookedCount': item['booked_count'] ?? 0,
+            };
 
             if (item['dates'] != null && item['dates'] is List) {
               for (var dateString in item['dates']) {
@@ -62,6 +74,26 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       }
     } catch (e) {
       print('Fehler beim Abrufen der Schulungen: $e');
+    }
+  }
+
+  Future<void> _fetchUserBookings() async {
+    int userId = Provider.of<AuthService>(context, listen: false).userId;
+    final url = Uri.parse('http://localhost:3001/api/users/$userId/bookings');
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        setState(() {
+          _userBookedTrainingIds =
+              data.map<int>((booking) => booking['training_id'] as int).toList();
+        });
+      } else {
+        print('Fehler beim Laden der Nutzerbuchungen: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Fehler beim Abrufen der Nutzerbuchungen: $e');
     }
   }
 
@@ -85,12 +117,23 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Training "$trainingName" gebucht!')),
         );
+        // Trainingsdaten und Nutzerbuchungen neu laden
+        _fetchTrainings();
+        _fetchUserBookings();
       } else {
-        final data = json.decode(response.body);
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['error'] ?? 'Fehler beim Buchen des Trainings')),
-        );
+        // Versuche, die Antwort als JSON zu parsen
+        try {
+          final data = json.decode(response.body);
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['error'] ?? 'Fehler beim Buchen des Trainings')),
+          );
+        } catch (e) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fehler beim Buchen des Trainings')),
+          );
+        }
       }
     } catch (e) {
       Navigator.pop(context);
@@ -111,7 +154,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Abbrechen'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => _bookTraining(trainingId, trainingName),
             child: const Text('Buchen'),
           ),
@@ -122,6 +165,9 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
 
   Widget _buildToggleButtons() {
     return ToggleButtons(
+      borderRadius: BorderRadius.circular(8.0),
+      selectedColor: Colors.white,
+      fillColor: Theme.of(context).primaryColor,
       isSelected: [
         _currentView == CalendarView.Jahr,
         _currentView == CalendarView.Monat,
@@ -343,12 +389,73 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
               Map<String, dynamic> training = trainingsForSelectedDay[index];
               String trainingName = training['name'];
               int trainingId = training['id'];
-              return ListTile(
-                title: Text(trainingName),
-                trailing: ElevatedButton(
-                  child: const Text('Buchen'),
-                  onPressed: () =>
-                      _showBookingDialog(trainingId, trainingName),
+              String description = training['description'];
+              String location = training['location'];
+              int maxParticipants = training['maxParticipants'];
+              int bookedCount = training['bookedCount'];
+              int spotsLeft = maxParticipants - bookedCount;
+              bool isBooked = _userBookedTrainingIds.contains(trainingId);
+
+              return Card(
+                elevation: 4,
+                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                child: ExpansionTile(
+                  title: Text(
+                    trainingName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Ort: $location',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  childrenPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        description,
+                        style: const TextStyle(color: Colors.black87),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.people, size: 16, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text('Max. Teilnehmer: $maxParticipants'),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.person, size: 16, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text('Bereits gebucht: $bookedCount'),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.event_seat, size: 16, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text('Freie Plätze: ${spotsLeft >= 0 ? spotsLeft : 0}'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    isBooked
+                        ? ElevatedButton.icon(
+                            icon: const Icon(Icons.check),
+                            label: const Text('Bereits gebucht'),
+                            onPressed: null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green, // Aktualisiert von 'primary' zu 'backgroundColor'
+                            ),
+                          )
+                        : ElevatedButton(
+                            onPressed: spotsLeft > 0
+                                ? () => _showBookingDialog(trainingId, trainingName)
+                                : null,
+                            child: const Text('Buchen'),
+                          ),
+                  ],
                 ),
               );
             },
@@ -359,7 +466,16 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Training Kalender'),
+        title: const Text('Schulungskalender'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              _fetchTrainings();
+              _fetchUserBookings();
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

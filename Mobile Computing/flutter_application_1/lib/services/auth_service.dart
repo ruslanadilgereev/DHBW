@@ -75,28 +75,34 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-Future<void> register(String email, String password, String role) async {
-  final url = Uri.parse('http://localhost:3001/api/register');
-  
-  final response = await http.post(
-    url,
-    headers: {'Content-Type': 'application/json'},
-    body: json.encode({
-      'email': email,
-      'password': password,
-      'role': role,
-    }),
-  );
-  print(response.body);
-  if (response.statusCode == 201) {
-    // Registrierung erfolgreich
-    // Sie können hier zusätzliche Aktionen durchführen
-  } else {
-    // Fehlerbehandlung
-    print('Statuscode: ${response.statusCode}');
-    print('Antwort: ${response.body}');
-    throw Exception('Registrierung fehlgeschlagen');
+ Future<void> register(
+    String email,
+    String password,
+    String role,
+    String firstName,
+    String lastName,
+    String company,
+    String phone,
+  ) async {
+    final response = await http.post(
+      Uri.parse('http://localhost:3001/api/register'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        'email': email,
+        'password': password,
+        'role': role,
+        'first_Name': firstName,
+        'last_Name': lastName,
+        'company': company,
+        'phone': phone,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception('Registrierung fehlgeschlagen');
+    }
   }
-}
 
 }

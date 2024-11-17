@@ -1,9 +1,8 @@
-// server.js
-
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs'); // Für Passwort-Hashing
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -12,7 +11,7 @@ dotenv.config();
 
 // Definiere die CORS-Optionen
 const corsOptions = {
-  origin: 'http://localhost:3000', // Ersetze 8080 durch den Port, auf dem deine Flutter-App läuft
+  origin: 'http://localhost:3000', // Passe den Port an, auf dem deine Flutter-App läuft
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
@@ -24,9 +23,7 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // Middleware
-//app.use(express.json({ type: ['application/json', 'text/plain'] }));
 app.use(express.json());
-
 
 // Create a MySQL pool
 const pool = mysql.createPool({
@@ -45,64 +42,133 @@ app.get('/', (req, res) => {
   res.send('Backend Server is Running');
 });
 
+app.get('/api/users/:userId/bookings', async (req, res) => {
+  const userId = req.params.userId;
+  const connection = await pool.getConnection();
 
-// Get all trainings
-app.get('/api/trainings', async (req, res) => {
   try {
-    const [trainings] = await pool.query(
-      'SELECT t.id, t.training_name, ' +
-      'GROUP_CONCAT(DISTINCT td.date ORDER BY td.date ASC) AS dates ' +
-      'FROM trainings t ' +
-      'LEFT JOIN training_dates td ON t.id = td.training_id ' +
-      'GROUP BY t.id'
+    const [bookings] = await connection.query(
+      `SELECT 
+        b.training_id,
+        s.titel AS training_name,
+        s.beschreibung,
+        s.ort,
+        s.max_teilnehmer,
+        s.dozent_id,
+        GROUP_CONCAT(DISTINCT ss.datum ORDER BY ss.datum ASC) AS dates
+      FROM bookings b
+      JOIN schulungen s ON b.training_id = s.id
+      LEFT JOIN schulung_sessions ss ON s.id = ss.schulung_id
+      WHERE b.user_id = ?
+      GROUP BY b.training_id
+      `,
+      [userId]
     );
 
-    res.json(
-      trainings.map((training) => ({
-        ...training,
-        dates: training.dates ? training.dates.split(',') : [],
-      }))
-    );
+    // Verarbeiten der Daten
+    const userBookings = bookings.map(row => ({
+      ...row,
+      dates: row.dates ? row.dates.split(',') : [],
+    }));
+
+    res.json(userBookings);
   } catch (error) {
-    console.error('Error fetching trainings:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Fehler beim Abrufen der Buchungen des Nutzers:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Buchungen' });
+  } finally {
+    connection.release();
   }
 });
 
 
-app.post('/api/trainings', async (req, res) => {
-  const { training_name, dates } = req.body;
+app.get('/api/trainings', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const [rows] = await connection.query(`
+      SELECT
+        s.id,
+        s.titel AS training_name,
+        s.beschreibung,
+        s.ort,
+        s.max_teilnehmer,
+        s.dozent_id,
+        s.gesamt_startdatum,
+        s.gesamt_enddatum,
+        GROUP_CONCAT(DISTINCT ss.datum ORDER BY ss.datum ASC) AS dates,
+        COUNT(DISTINCT b.id) AS booked_count
+      FROM
+        schulungen s
+      LEFT JOIN
+        schulung_sessions ss ON s.id = ss.schulung_id
+      LEFT JOIN
+        bookings b ON s.id = b.training_id
+      GROUP BY
+        s.id
+    `);
 
-  if (!training_name || !Array.isArray(dates) || dates.length === 0) {
-    return res.status(400).json({ error: 'Missing required fields or invalid format' });
+    const trainings = rows.map(row => ({
+      ...row,
+      dates: row.dates ? row.dates.split(',') : [],
+    }));
+
+    res.json(trainings);
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Schulungen:', error);
+    res.status(500).send({ message: 'Fehler beim Abrufen der Schulungen' });
+  } finally {
+    connection.release();
   }
+});
+
+
+
+// Create a new training
+app.post('/api/trainings', async (req, res) => {
+  const { training_name, description, location, max_participants, lecturer_id, dates, pauses } = req.body;
+
+  const connection = await pool.getConnection();
 
   try {
-    // Training einfügen
-    const [trainingResult] = await pool.query(
-      'INSERT INTO trainings (training_name) VALUES (?)',
-      [training_name]
-    );
-    const trainingId = trainingResult.insertId;
+    // Beginne eine Transaktion
+    await connection.beginTransaction();
 
-    // Termine einfügen
-    const dateValues = dates.map((date) => [trainingId, date]);
-    if (dateValues.length > 0) {
-      await pool.query(
-        'INSERT INTO training_dates (training_id, date) VALUES ?',
-        [dateValues]
+    // Füge die Schulung hinzu
+    const [result] = await connection.execute(
+      'INSERT INTO schulungen (titel, beschreibung, ort, max_teilnehmer, dozent_id, gesamt_startdatum, gesamt_enddatum) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [training_name, description, location, max_participants, lecturer_id, dates[0], dates[dates.length - 1]]
+    );
+
+    const trainingId = result.insertId;
+
+    // Füge die Trainingstage hinzu
+    const sessionInserts = dates.map(date => [trainingId, date, '09:00:00', '17:00:00', 'normal', null]);
+    await connection.query(
+      'INSERT INTO schulung_sessions (schulung_id, datum, startzeit, endzeit, typ, bemerkung) VALUES ?',
+      [sessionInserts]
+    );
+
+    // Füge die Pausen hinzu
+    if (pauses && pauses.length > 0) {
+      const pauseInserts = pauses.map(pause => [trainingId, pause.start, pause.end, 'Pausengrund']);
+      await connection.query(
+        'INSERT INTO schulung_pause (schulung_id, start_datum, end_datum, grund) VALUES ?',
+        [pauseInserts]
       );
     }
 
-    res.status(201).json({ message: 'Training added successfully', id: trainingId });
+    // Commit der Transaktion
+    await connection.commit();
+    res.status(201).send({ message: 'Schulung hinzugefügt' });
   } catch (error) {
-    console.error('Error adding training:', error);
-    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+    // Rollback bei Fehler
+    await connection.rollback();
+    console.error('Fehler beim Hinzufügen der Schulung:', error);
+    res.status(500).send({ message: 'Fehler beim Hinzufügen der Schulung' });
+  } finally {
+    // Verbindung freigeben
+    connection.release();
   }
 });
-
-
-
 
 // Update a training by ID
 app.put('/api/trainings/:id', async (req, res) => {
@@ -111,7 +177,7 @@ app.put('/api/trainings/:id', async (req, res) => {
 
   try {
     const [result] = await pool.query(
-      'UPDATE trainings SET date = ?, training_name = ? WHERE id = ?',
+      'UPDATE schulungen SET gesamt_startdatum = ?, titel = ? WHERE id = ?',
       [date, training_name, id]
     );
 
@@ -131,11 +197,8 @@ app.delete('/api/trainings/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Clear references to the training in the bookings table
-    await pool.query('UPDATE bookings SET training_id = NULL WHERE training_id = ?', [id]);
-
-    // Delete the training
-    const [result] = await pool.query('DELETE FROM trainings WHERE id = ?', [id]);
+    // Lösche die Schulung und die zugehörigen Daten
+    const [result] = await pool.query('DELETE FROM schulungen WHERE id = ?', [id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Training not found' });
@@ -148,45 +211,31 @@ app.delete('/api/trainings/:id', async (req, res) => {
   }
 });
 
-
-
-// Benutzer registrieren
-
+// User Registration
 app.post('/api/register', async (req, res) => {
-  const { email, password, role } = req.body;
-
-  if (!email || !password || !role) {
-    return res.status(400).json({ error: 'Alle Felder sind erforderlich' });
-  }
-
+  const { vorname, nachname, unternehmen, rolle, email, telefon, passwort } = req.body; // Weitere Eigenschaften können hinzugefügt werden
   try {
-    // Überprüfen, ob der Benutzer bereits existiert
-    const [existingUser] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-    if (existingUser.length > 0) {
-      return res.status(400).json({ error: 'Benutzer existiert bereits' });
-    }
+    // Insert the user into the database
+    const hashedPassword = await bcrypt.hash(passwort, 10); // bcrypt for secure password storage
 
-    // Passwort hashen
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Benutzer erstellen
-    await pool.query(
-      'INSERT INTO users (email, password, role) VALUES (?, ?, ?)',
-      [email, hashedPassword, role]
+    const [result] = await pool.query(
+      `INSERT INTO users (first_Name, last_Name, company, role, email, phone, password)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [vorname, nachname, unternehmen, rolle, email, telefon, hashedPassword] // Hash passwort for security
     );
-    res.status(201).json({ message: 'Benutzer registriert' });
+
+    res.status(201).json({ 
+      message: 'User registered successfully', 
+      userId: result.insertId 
+    });
   } catch (error) {
-    console.error('Fehler bei der Registrierung:', error);
-    res.status(500).json({ error: 'Interner Serverfehler' });
+    console.error('Error during registration:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 
 // Benutzer anmelden
-// server.js (zusätzlicher Endpunkt für Login)
-
-const bcrypt = require('bcryptjs'); // Für Passwort-Hashing (sollte installiert sein)
-
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -223,52 +272,27 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-
-// Create a booking
-app.post('/api/bookings', async (req, res) => {
-  const { user_id, training_id } = req.body;
-
-  if (!user_id || !training_id) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
-  try {
-    // Überprüfung auf bestehende Buchung
-    const [existingBooking] = await pool.query(
-      'SELECT id FROM bookings WHERE user_id = ? AND training_id = ?',
-      [user_id, training_id]
-    );
-
-    if (existingBooking.length > 0) {
-      return res.status(400).json({ error: 'You have already booked this training' });
-    }
-
-    // Buchung erstellen
-    await pool.query(
-      'INSERT INTO bookings (user_id, training_id) VALUES (?, ?)',
-      [user_id, training_id]
-    );
-
-    res.status(201).json({ message: 'Training booked successfully' });
-  } catch (error) {
-    console.error('Error booking training:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-
-
 // Get bookings for a specific training
 app.get('/api/trainings/:id/bookings', async (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // Training ID from the URL
   try {
     const [rows] = await pool.query(
-      `SELECT bookings.id, users.email AS user_email
-      FROM bookings
-      JOIN users ON bookings.user_id = users.id
-      WHERE bookings.training_id = ?`,
-      [id]
-    );
+      `SELECT 
+         b.id AS booking_id, 
+         b.training_id, 
+         u.id AS user_id,
+         u.email AS user_email,
+         u.first_name,
+         u.last_name,
+         u.company,
+         u.phone,
+         s.titel AS training_title
+       FROM bookings b
+       JOIN users u ON b.user_id = u.id
+       JOIN schulungen s ON b.training_id = s.id
+       WHERE b.training_id = ?`,
+      [id] // Use the ID from the URL params
+    );    
     res.json(rows);
   } catch (error) {
     console.error('Error fetching bookings:', error);
@@ -277,24 +301,57 @@ app.get('/api/trainings/:id/bookings', async (req, res) => {
 });
 
 
-app.get('/api/trainings', async (req, res) => {
+
+app.post('/api/bookings', async (req, res) => {
+  const { user_id, training_id } = req.body;
+
+  if (!user_id || !training_id) {
+    return res.status(400).json({ error: 'user_id und training_id sind erforderlich' });
+  }
+
+  const connection = await pool.getConnection();
+
   try {
-    const [trainings] = await pool.query(
-      'SELECT t.id, t.training_name, GROUP_CONCAT(td.date ORDER BY td.date ASC) AS dates ' +
-      'FROM trainings t ' +
-      'LEFT JOIN training_dates td ON t.id = td.training_id ' +
-      'GROUP BY t.id'
+    // Überprüfen, ob der Nutzer die Schulung bereits gebucht hat
+    const [existingBooking] = await connection.query(
+      'SELECT * FROM bookings WHERE user_id = ? AND training_id = ?',
+      [user_id, training_id]
     );
 
-    res.json(trainings.map((training) => ({
-      ...training,
-      dates: training.dates ? training.dates.split(',') : [],
-    })));
+    if (existingBooking.length > 0) {
+      return res.status(400).json({ error: 'Sie haben dieses Training bereits gebucht' });
+    }
+
+    // Überprüfen, ob es noch freie Plätze gibt
+    const [[{ booked_count }]] = await connection.query(
+      'SELECT COUNT(*) AS booked_count FROM bookings WHERE training_id = ?',
+      [training_id]
+    );
+
+    const [[{ max_teilnehmer }]] = await connection.query(
+      'SELECT max_teilnehmer FROM schulungen WHERE id = ?',
+      [training_id]
+    );
+
+    if (booked_count >= max_teilnehmer) {
+      return res.status(400).json({ error: 'Keine freien Plätze mehr verfügbar' });
+    }
+
+    // Buchung einfügen
+    await connection.query(
+      'INSERT INTO bookings (user_id, training_id) VALUES (?, ?)',
+      [user_id, training_id]
+    );
+
+    res.status(201).json({ message: 'Buchung erfolgreich' });
   } catch (error) {
-    console.error('Error fetching trainings:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Fehler bei der Buchung:', error);
+    res.status(500).json({ error: 'Fehler bei der Buchung' });
+  } finally {
+    connection.release();
   }
 });
+
 
 
 app.listen(port, () => {
