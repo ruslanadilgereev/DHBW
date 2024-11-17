@@ -55,7 +55,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         companyController.text,
         phoneController.text,
       );
-
       // Nach erfolgreicher Registrierung zur Login-Seite zurückkehren
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,6 +127,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 child: const Text('Registrieren'),
+                
                 onPressed: () => _register(context),
               ),
               TextButton(

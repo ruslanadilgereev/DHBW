@@ -213,17 +213,16 @@ app.delete('/api/trainings/:id', async (req, res) => {
 
 // User Registration
 app.post('/api/register', async (req, res) => {
-  const { vorname, nachname, unternehmen, rolle, email, telefon, passwort } = req.body; // Weitere Eigenschaften können hinzugefügt werden
+  const { email, password, role, first_name, last_name, company, phone } = req.body; // Weitere Eigenschaften können hinzugefügt werden
   try {
     // Insert the user into the database
-    const hashedPassword = await bcrypt.hash(passwort, 10); // bcrypt for secure password storage
+    const hashedPassword = await bcrypt.hash(password, 10); // bcrypt for secure password storage
 
     const [result] = await pool.query(
-      `INSERT INTO users (first_Name, last_Name, company, role, email, phone, password)
+      `INSERT INTO users (first_name, last_name, company, role, email, phone, password)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [vorname, nachname, unternehmen, rolle, email, telefon, hashedPassword] // Hash passwort for security
+      [first_name, last_name, company, role, email, phone, hashedPassword] // Hash passwort for security
     );
-
     res.status(201).json({ 
       message: 'User registered successfully', 
       userId: result.insertId 
