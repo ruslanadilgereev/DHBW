@@ -58,7 +58,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       // Nach erfolgreicher Registrierung zur Login-Seite zurückkehren
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registrierung erfolgreich! Bitte melden Sie sich an.')),
+        const SnackBar(
+            content:
+                Text('Registrierung erfolgreich! Bitte melden Sie sich an.')),
       );
     } catch (e) {
       // Fehlerbehandlung
@@ -127,7 +129,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 child: const Text('Registrieren'),
-                
                 onPressed: () => _register(context),
               ),
               TextButton(

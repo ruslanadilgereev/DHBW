@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/lecturer_service.dart';
 
 class ManageTrainingsPage extends StatefulWidget {
   const ManageTrainingsPage({super.key});
@@ -11,16 +12,43 @@ class ManageTrainingsPage extends StatefulWidget {
 
 class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
   List<dynamic> trainings = [];
+  final LecturerService _lecturerService = LecturerService();
+  List<Lecturer> _lecturers = [];
+  Lecturer? _selectedLecturer;
 
   @override
   void initState() {
     super.initState();
     fetchTrainings();
+    _fetchLecturers();
+  }
+
+  Future<void> _fetchLecturers() async {
+    try {
+      final lecturers = await _lecturerService.getLecturers();
+      setState(() {
+        _lecturers = lecturers;
+        // If we have a selected lecturer, find its corresponding instance in the new list
+        if (_selectedLecturer != null) {
+          _selectedLecturer = lecturers.firstWhere(
+            (l) => l.id == _selectedLecturer!.id,
+            orElse: () => _selectedLecturer!,
+          );
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler beim Laden der Dozenten: $e')),
+        );
+      }
+    }
   }
 
   Future<void> fetchTrainings() async {
     try {
-      final response = await http.get(Uri.parse('http://localhost:3001/api/trainings'));
+      final response =
+          await http.get(Uri.parse('http://localhost:3001/api/trainings'));
       if (response.statusCode == 200) {
         setState(() {
           trainings = json.decode(response.body);
@@ -43,48 +71,76 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     TextEditingController descriptionController = TextEditingController();
     TextEditingController locationController = TextEditingController();
     TextEditingController maxParticipantsController = TextEditingController();
-    TextEditingController lecturerIdController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setState) {
+          builder: (BuildContext context, StateSetter setDialogState) {
             return AlertDialog(
               title: const Text('Neue Schulung hinzufügen'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Schulungsname
                     TextField(
                       controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Schulungsname'),
+                      decoration:
+                          const InputDecoration(labelText: 'Schulungsname'),
                       onChanged: (value) {
                         trainingName = value;
                       },
                     ),
-                    // Beschreibung
                     TextField(
                       controller: descriptionController,
-                      decoration: const InputDecoration(labelText: 'Beschreibung'),
+                      decoration:
+                          const InputDecoration(labelText: 'Beschreibung'),
                     ),
-                    // Ort
                     TextField(
                       controller: locationController,
                       decoration: const InputDecoration(labelText: 'Ort'),
                     ),
-                    // Maximale Teilnehmerzahl
                     TextField(
                       controller: maxParticipantsController,
-                      decoration: const InputDecoration(labelText: 'Maximale Teilnehmerzahl'),
+                      decoration: const InputDecoration(
+                          labelText: 'Maximale Teilnehmerzahl'),
                       keyboardType: TextInputType.number,
                     ),
-                    // Dozent ID
-                    TextField(
-                      controller: lecturerIdController,
-                      decoration: const InputDecoration(labelText: 'Dozent ID'),
-                      keyboardType: TextInputType.number,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<Lecturer>(
+                            decoration:
+                                const InputDecoration(labelText: 'Dozent'),
+                            value: _selectedLecturer,
+                            items: _lecturers.map((lecturer) {
+                              return DropdownMenuItem<Lecturer>(
+                                key: ValueKey(lecturer.id ?? -1),
+                                value: lecturer,
+                                child: Text(lecturer.fullName),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setDialogState(() {
+                                setState(() {
+                                  _selectedLecturer = value;
+                                });
+                              });
+                            },
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          tooltip: 'Neuen Dozenten erstellen',
+                          onPressed: () async {
+                            final result = await _showAddLecturerDialog();
+                            if (result == true) {
+                              // Force the dialog to rebuild with the new lecturer list
+                              setDialogState(() {});
+                            }
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 10),
                     // Gesamtzeitraum auswählen
@@ -96,13 +152,16 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                           firstDate: DateTime(2020),
                           lastDate: DateTime(2101),
                           initialDateRange: selectedDates.isNotEmpty
-                              ? DateTimeRange(start: selectedDates.first, end: selectedDates.last)
+                              ? DateTimeRange(
+                                  start: selectedDates.first,
+                                  end: selectedDates.last)
                               : null,
                         );
                         if (pickedRange != null) {
-                          setState(() {
+                          setDialogState(() {
                             // Generiere Trainingstage innerhalb des gewählten Zeitraums
-                            selectedDates = _generateTrainingDates(pickedRange.start, pickedRange.end, pauses);
+                            selectedDates = _generateTrainingDates(
+                                pickedRange.start, pickedRange.end, pauses);
                           });
                         }
                       },
@@ -125,7 +184,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                         return Chip(
                           label: Text(_formatDate(date)),
                           onDeleted: () {
-                            setState(() {
+                            setDialogState(() {
                               selectedDates.remove(date);
                             });
                           },
@@ -139,14 +198,21 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                         final pickedPause = await showDateRangePicker(
                           locale: const Locale("de", "DE"),
                           context: dialogContext,
-                          firstDate: selectedDates.isNotEmpty ? selectedDates.first : DateTime.now(),
-                          lastDate: selectedDates.isNotEmpty ? selectedDates.last : DateTime(2101),
+                          firstDate: selectedDates.isNotEmpty
+                              ? selectedDates.first
+                              : DateTime.now(),
+                          lastDate: selectedDates.isNotEmpty
+                              ? selectedDates.last
+                              : DateTime(2101),
                         );
                         if (pickedPause != null) {
-                          setState(() {
+                          setDialogState(() {
                             pauses.add(pickedPause);
                             // Aktualisiere die Trainingstage basierend auf den Pausen
-                            selectedDates = _generateTrainingDates(selectedDates.first, selectedDates.last, pauses);
+                            selectedDates = _generateTrainingDates(
+                                selectedDates.first,
+                                selectedDates.last,
+                                pauses);
                           });
                         }
                       },
@@ -163,12 +229,16 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                             spacing: 8.0,
                             children: pauses.map((range) {
                               return Chip(
-                                label: Text('${_formatDate(range.start)} - ${_formatDate(range.end)}'),
+                                label: Text(
+                                    '${_formatDate(range.start)} - ${_formatDate(range.end)}'),
                                 onDeleted: () {
-                                  setState(() {
+                                  setDialogState(() {
                                     pauses.remove(range);
                                     // Aktualisiere die Trainingstage nach dem Entfernen einer Pause
-                                    selectedDates = _generateTrainingDates(selectedDates.first, selectedDates.last, pauses);
+                                    selectedDates = _generateTrainingDates(
+                                        selectedDates.first,
+                                        selectedDates.last,
+                                        pauses);
                                   });
                                 },
                               );
@@ -189,7 +259,9 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                 ElevatedButton(
                   child: const Text('Hinzufügen'),
                   onPressed: () async {
-                    if (trainingName.isNotEmpty && selectedDates.isNotEmpty) {
+                    if (trainingName.isNotEmpty &&
+                        selectedDates.isNotEmpty &&
+                        _selectedLecturer != null) {
                       await addTraining(
                         trainingName,
                         selectedDates,
@@ -197,11 +269,12 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                         descriptionController.text,
                         locationController.text,
                         int.tryParse(maxParticipantsController.text) ?? 0,
-                        int.tryParse(lecturerIdController.text) ?? 0,
+                        _selectedLecturer?.id ?? 0,
                       );
                       Navigator.of(dialogContext).pop();
                     } else {
-                      showErrorSnackbar('Bitte geben Sie einen Namen und mindestens ein Datum an');
+                      showErrorSnackbar(
+                          'Bitte geben Sie einen Namen, mindestens ein Datum und einen Dozenten an');
                     }
                   },
                 ),
@@ -213,19 +286,111 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     );
   }
 
+  Future<bool> _showAddLecturerDialog() async {
+    final TextEditingController vornameController = TextEditingController();
+    final TextEditingController nachnameController = TextEditingController();
+    final TextEditingController emailController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Neuen Dozenten hinzufügen'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: vornameController,
+                  decoration: const InputDecoration(labelText: 'Vorname'),
+                ),
+                TextField(
+                  controller: nachnameController,
+                  decoration: const InputDecoration(labelText: 'Nachname'),
+                ),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Abbrechen'),
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+            ),
+            TextButton(
+              child: const Text('Hinzufügen'),
+              onPressed: () async {
+                if (vornameController.text.isNotEmpty &&
+                    nachnameController.text.isNotEmpty &&
+                    emailController.text.isNotEmpty) {
+                  try {
+                    final newLecturer = await _lecturerService.createLecturer(
+                      vornameController.text,
+                      nachnameController.text,
+                      emailController.text,
+                    );
+
+                    // Update the lecturers list and select the new lecturer
+                    final updatedLecturers =
+                        await _lecturerService.getLecturers();
+                    if (mounted) {
+                      setState(() {
+                        _lecturers = updatedLecturers;
+                        // Find and select the new lecturer by ID
+                        _selectedLecturer = updatedLecturers.firstWhere(
+                          (l) => l.id == newLecturer.id,
+                          orElse: () => newLecturer,
+                        );
+                      });
+
+                      Navigator.of(context).pop(true);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Dozent erfolgreich hinzugefügt')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Fehler: ${e.toString()}')),
+                      );
+                      Navigator.of(context).pop(false);
+                    }
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false; // Handle null case when dialog is dismissed
+  }
+
   // Hilfsfunktion zum Formatieren von Datum
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
   // Hilfsfunktion zum Generieren von Trainingstagen unter Berücksichtigung von Pausen
-  List<DateTime> _generateTrainingDates(DateTime start, DateTime end, List<DateTimeRange> pauses) {
+  List<DateTime> _generateTrainingDates(
+      DateTime start, DateTime end, List<DateTimeRange> pauses) {
     List<DateTime> dates = [];
     DateTime current = start;
     while (!current.isAfter(end)) {
       bool isPaused = pauses.any((pause) =>
-          (current.isAfter(pause.start.subtract(const Duration(days: 1))) && current.isBefore(pause.end.add(const Duration(days: 1)))));
-      if (!isPaused && current.weekday != DateTime.saturday && current.weekday != DateTime.sunday) {
+          (current.isAfter(pause.start.subtract(const Duration(days: 1))) &&
+              current.isBefore(pause.end.add(const Duration(days: 1)))));
+      if (!isPaused &&
+          current.weekday != DateTime.saturday &&
+          current.weekday != DateTime.sunday) {
         dates.add(current);
       }
       current = current.add(const Duration(days: 1));
@@ -255,11 +420,15 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
           'location': location,
           'max_participants': maxParticipants,
           'lecturer_id': lecturerId,
-          'dates': dates.map((date) => date.toIso8601String().split('T').first).toList(),
-          'pauses': pauses.map((pause) => {
-                'start': pause.start.toIso8601String().split('T').first,
-                'end': pause.end.toIso8601String().split('T').first,
-              }).toList(),
+          'dates': dates
+              .map((date) => date.toIso8601String().split('T').first)
+              .toList(),
+          'pauses': pauses
+              .map((pause) => {
+                    'start': pause.start.toIso8601String().split('T').first,
+                    'end': pause.end.toIso8601String().split('T').first,
+                  })
+              .toList(),
         }),
       );
 
@@ -303,13 +472,15 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                   children: [
                     const Text(
                       'Buchungen für Schulung',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
                     Expanded(
                       child: bookings.isEmpty
                           ? const Center(
-                              child: Text('Keine Buchungen für diese Schulung.'),
+                              child:
+                                  Text('Keine Buchungen für diese Schulung.'),
                             )
                           : ListView.builder(
                               itemCount: bookings.length,
@@ -317,16 +488,22 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                                 var booking = bookings[index];
                                 return ListTile(
                                   title: Text(
-                                    '${booking['first_name'] ?? 'Unbekannt'} ${booking['last_name'] ?? ''}'.trim(),
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    '${booking['first_name'] ?? 'Unbekannt'} ${booking['last_name'] ?? ''}'
+                                        .trim(),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
                                   subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text('Email: ${booking['user_email'] ?? 'Nicht verfügbar'}'),
-                                      if (booking['company'] != null && booking['company'].isNotEmpty)
+                                      Text(
+                                          'Email: ${booking['user_email'] ?? 'Nicht verfügbar'}'),
+                                      if (booking['company'] != null &&
+                                          booking['company'].isNotEmpty)
                                         Text('Firma: ${booking['company']}'),
-                                      if (booking['phone'] != null && booking['phone'].isNotEmpty)
+                                      if (booking['phone'] != null &&
+                                          booking['phone'].isNotEmpty)
                                         Text('Telefon: ${booking['phone']}'),
                                     ],
                                   ),
@@ -357,51 +534,110 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
   }
 
   Widget buildTrainingItem(dynamic training) {
+    final List<dynamic> dates = (training['dates'] as List?) ?? [];
+    final bool isMultiDay = dates.length > 1;
+    final int maxParticipants = training['max_teilnehmer'] ?? 0;
+    final int bookedCount = training['booked_count'] ?? 0;
+    final int availableSpots = maxParticipants - bookedCount;
+
     return Card(
-      elevation: 4,
+      elevation: isMultiDay ? 4 : 1,
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: ListTile(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isMultiDay ? Theme.of(context).primaryColor : Colors.orange,
+          width: 2,
+        ),
+      ),
+      child: ExpansionTile(
         leading: const Icon(Icons.school, color: Colors.blueAccent),
-        title: Text(
-          training['training_name'] ?? 'Unbenannte Schulung',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                training['training_name'] ?? 'Unbenannte Schulung',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: availableSpots > 0
+                    ? Colors.green.shade100
+                    : Colors.red.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${maxParticipants - bookedCount}/$maxParticipants Plätze',
+                style: TextStyle(
+                  color: availableSpots > 0
+                      ? Colors.green.shade900
+                      : Colors.red.shade900,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Beschreibung: ${training['beschreibung'] ?? 'Keine Beschreibung'}'),
-            Text('Ort: ${training['ort'] ?? 'Kein Ort angegeben'}'),
-            Text('Max. Teilnehmer: ${training['max_teilnehmer'] ?? 'Keine Angabe'}'),
-            Text('Dozent ID: ${training['dozent_id'] ?? 'Keine Angabe'}'),
-            const SizedBox(height: 8),
-            const Text('Termine:'),
-            if (training['dates'] != null && training['dates'] is List)
-              for (var date in training['dates']) Text('- $date')
-            else
-              const Text('Keine Termine verfügbar'),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.people, color: Colors.blueAccent),
-              onPressed: () {
-                _viewBookings(training['id']);
-              },
+            const SizedBox(height: 4),
+            Text(
+              'Dozent ID: ${training['dozent_id'] ?? 'Keine Angabe'}',
+              style: const TextStyle(fontSize: 14),
             ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.redAccent),
-              onPressed: () {
-                _deleteTraining(training['id']);
-              },
+            Text(
+              'Ort: ${training['ort'] ?? 'Kein Ort angegeben'}',
+              style: const TextStyle(fontSize: 14),
             ),
           ],
         ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Beschreibung:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(training['beschreibung'] ?? 'Keine Beschreibung'),
+                const SizedBox(height: 16),
+                const Text(
+                  'Termine:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                ...dates.map((date) => Text('- $date')),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.people, color: Colors.blueAccent),
+                      onPressed: () => _viewBookings(training['id']),
+                      tooltip: 'Buchungen anzeigen',
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () => _deleteTraining(training['id']),
+                      tooltip: 'Schulung löschen',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
-
 
   Future<void> _deleteTraining(int trainingId) async {
     try {

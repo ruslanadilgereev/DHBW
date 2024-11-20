@@ -55,20 +55,32 @@ app.get('/api/users/:userId/bookings', async (req, res) => {
         s.ort,
         s.max_teilnehmer,
         s.dozent_id,
-        GROUP_CONCAT(DISTINCT ss.datum ORDER BY ss.datum ASC) AS dates
+        d.vorname AS dozent_vorname,
+        d.nachname AS dozent_nachname,
+        d.email AS dozent_email,
+        GROUP_CONCAT(DISTINCT DATE_FORMAT(ss.datum, '%Y-%m-%d') ORDER BY ss.datum ASC) AS dates,
+        COUNT(DISTINCT b2.id) AS booked_count,
+        MIN(ss.datum) as start_date,
+        MAX(ss.datum) as end_date,
+        COUNT(DISTINCT ss.datum) as session_count
       FROM bookings b
       JOIN schulungen s ON b.training_id = s.id
+      LEFT JOIN dozenten d ON s.dozent_id = d.id
       LEFT JOIN schulung_sessions ss ON s.id = ss.schulung_id
+      LEFT JOIN bookings b2 ON s.id = b2.training_id
       WHERE b.user_id = ?
       GROUP BY b.training_id
-      `,
+      ORDER BY s.titel ASC`,
       [userId]
     );
 
-    // Verarbeiten der Daten
+    // Process the dates and format
     const userBookings = bookings.map(row => ({
       ...row,
       dates: row.dates ? row.dates.split(',') : [],
+      start_date: row.start_date ? row.start_date.toISOString().split('T')[0] : null,
+      end_date: row.end_date ? row.end_date.toISOString().split('T')[0] : null,
+      is_multi_day: row.session_count > 1
     }));
 
     res.json(userBookings);
@@ -79,7 +91,6 @@ app.get('/api/users/:userId/bookings', async (req, res) => {
     connection.release();
   }
 });
-
 
 app.get('/api/trainings', async (req, res) => {
   const connection = await pool.getConnection();
@@ -92,35 +103,45 @@ app.get('/api/trainings', async (req, res) => {
         s.ort,
         s.max_teilnehmer,
         s.dozent_id,
-        s.gesamt_startdatum,
-        s.gesamt_enddatum,
-        GROUP_CONCAT(DISTINCT ss.datum ORDER BY ss.datum ASC) AS dates,
-        COUNT(DISTINCT b.id) AS booked_count
+        d.vorname AS dozent_vorname,
+        d.nachname AS dozent_nachname,
+        d.email AS dozent_email,
+        GROUP_CONCAT(DISTINCT DATE_FORMAT(ss.datum, '%Y-%m-%d') ORDER BY ss.datum ASC) AS dates,
+        COUNT(DISTINCT b.id) AS booked_count,
+        MIN(ss.datum) as start_date,
+        MAX(ss.datum) as end_date,
+        COUNT(DISTINCT ss.datum) as session_count
       FROM
         schulungen s
+      LEFT JOIN
+        dozenten d ON s.dozent_id = d.id
       LEFT JOIN
         schulung_sessions ss ON s.id = ss.schulung_id
       LEFT JOIN
         bookings b ON s.id = b.training_id
       GROUP BY
         s.id
+      ORDER BY
+        start_date ASC
     `);
 
+    // Process the dates
     const trainings = rows.map(row => ({
       ...row,
       dates: row.dates ? row.dates.split(',') : [],
+      start_date: row.start_date ? row.start_date.toISOString().split('T')[0] : null,
+      end_date: row.end_date ? row.end_date.toISOString().split('T')[0] : null,
+      is_multi_day: row.session_count > 1
     }));
 
     res.json(trainings);
   } catch (error) {
-    console.error('Fehler beim Abrufen der Schulungen:', error);
-    res.status(500).send({ message: 'Fehler beim Abrufen der Schulungen' });
+    console.error('Error fetching trainings:', error);
+    res.status(500).json({ error: 'Error fetching trainings' });
   } finally {
     connection.release();
   }
 });
-
-
 
 // Create a new training
 app.post('/api/trainings', async (req, res) => {
@@ -233,7 +254,6 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-
 // Benutzer anmelden
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
@@ -299,8 +319,103 @@ app.get('/api/trainings/:id/bookings', async (req, res) => {
   }
 });
 
+// Search trainings
+app.get('/api/trainings/search', async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
 
+    // Clean and prepare search patterns
+    const searchWords = query.toLowerCase().trim().split(/\s+/);
+    
+    // Handle date searches
+    const cleanQuery = query.replace(/\./g, ''); // Remove dots
+    const dateSearchPattern = `%${cleanQuery}%`;
+    const dateParts = query.split('.');
+    const dayPattern = dateParts[0] ? `%${dateParts[0]}%` : '%';
+    const monthPattern = dateParts[1] ? `%${dateParts[1]}%` : '%';
 
+    // Create a CTE for each search word
+    const wordQueries = searchWords.map((word, index) => `
+      SELECT DISTINCT s.id
+      FROM schulungen s
+      LEFT JOIN dozenten d ON s.dozent_id = d.id
+      LEFT JOIN schulung_sessions ss ON s.id = ss.schulung_id
+      WHERE 
+        LOWER(s.titel) LIKE ? OR
+        LOWER(s.beschreibung) LIKE ? OR
+        LOWER(s.ort) LIKE ? OR
+        LOWER(d.vorname) LIKE ? OR
+        LOWER(d.nachname) LIKE ? OR
+        LOWER(d.email) LIKE ? OR
+        LOWER(CONCAT(d.vorname, ' ', d.nachname)) LIKE ? OR
+        LOWER(CONCAT(d.nachname, ' ', d.vorname)) LIKE ? OR
+        DATE_FORMAT(ss.datum, '%d') LIKE ? OR
+        DATE_FORMAT(ss.datum, '%m') LIKE ? OR
+        DATE_FORMAT(ss.datum, '%Y') LIKE ? OR
+        DATE_FORMAT(ss.datum, '%d.%m.%Y') LIKE ? OR
+        CAST(s.max_teilnehmer AS CHAR) LIKE ?
+    `).join(' INTERSECT ');
+
+    const searchQuery = `
+      WITH matching_ids AS (${wordQueries})
+      SELECT 
+        s.*,
+        d.vorname as dozent_vorname,
+        d.nachname as dozent_nachname,
+        d.email as dozent_email,
+        (SELECT COUNT(*) FROM bookings b WHERE b.training_id = s.id) as booked_count,
+        GROUP_CONCAT(ss.datum ORDER BY ss.datum) as dates,
+        MIN(ss.datum) as start_date,
+        MAX(ss.datum) as end_date,
+        s.titel as training_name
+      FROM matching_ids m
+      JOIN schulungen s ON s.id = m.id
+      LEFT JOIN dozenten d ON s.dozent_id = d.id
+      LEFT JOIN schulung_sessions ss ON s.id = ss.schulung_id
+      GROUP BY s.id
+      ORDER BY s.gesamt_startdatum ASC
+    `;
+
+    // Create parameters array for all search words
+    const params = searchWords.flatMap(word => {
+      const pattern = `%${word}%`;
+      return [
+        pattern, // titel
+        pattern, // beschreibung
+        pattern, // ort
+        pattern, // vorname
+        pattern, // nachname
+        pattern, // email
+        pattern, // full name (firstname lastname)
+        pattern, // full name (lastname firstname)
+        pattern, // day
+        pattern, // month
+        pattern, // year
+        pattern, // full date
+        pattern  // max_teilnehmer
+      ];
+    });
+
+    const [trainings] = await pool.execute(searchQuery, params);
+
+    // Process dates for each training
+    const processedTrainings = trainings.map(training => ({
+      ...training,
+      dates: training.dates ? training.dates.split(',') : [],
+      is_multi_day: training.dates ? training.dates.split(',').length > 1 : false
+    }));
+
+    res.json(processedTrainings);
+  } catch (error) {
+    console.error('Error in search endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create a new booking
 app.post('/api/bookings', async (req, res) => {
   const { user_id, training_id } = req.body;
 
@@ -351,8 +466,162 @@ app.post('/api/bookings', async (req, res) => {
   }
 });
 
+// Cancel a booking
+app.delete('/api/bookings', async (req, res) => {
+  const { user_id, training_id } = req.query; // Changed from req.body to req.query for DELETE request
 
+  if (!user_id || !training_id) {
+    return res.status(400).json({ error: 'user_id und training_id sind erforderlich' });
+  }
 
+  const connection = await pool.getConnection();
+  try {
+    // Check if the booking exists
+    const [existingBooking] = await connection.query(
+      'SELECT * FROM bookings WHERE user_id = ? AND training_id = ?',
+      [user_id, training_id]
+    );
+
+    if (existingBooking.length === 0) {
+      return res.status(404).json({ error: 'Buchung nicht gefunden' });
+    }
+
+    // Delete the booking
+    const [result] = await connection.query(
+      'DELETE FROM bookings WHERE user_id = ? AND training_id = ?',
+      [user_id, training_id]
+    );
+
+    console.log('Booking deleted:', { user_id, training_id, affectedRows: result.affectedRows });
+
+    res.json({ 
+      message: 'Buchung erfolgreich storniert',
+      affectedRows: result.affectedRows 
+    });
+  } catch (error) {
+    console.error('Error canceling booking:', error);
+    res.status(500).json({ error: 'Fehler beim Stornieren der Buchung' });
+  } finally {
+    connection.release();
+  }
+});
+
+// Cancel a training booking
+app.delete('/api/trainings/:trainingId/cancel/:userId', async (req, res) => {
+  const { trainingId, userId } = req.params;
+
+  try {
+    const db = await pool.getConnection();
+    const collection = db;
+
+    const training = await collection.query('SELECT * FROM bookings WHERE training_id = ? AND user_id = ?', [trainingId, userId]);
+
+    if (!training[0]) {
+      return res.status(404).json({ error: 'Training not found' });
+    }
+
+    // Remove user from bookedBy array
+    const result = await collection.query(
+      'DELETE FROM bookings WHERE training_id = ? AND user_id = ?',
+      [trainingId, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(400).json({ error: 'User was not booked for this training' });
+    }
+
+    res.json({ message: 'Training cancelled successfully' });
+  } catch (error) {
+    console.error('Error cancelling training:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Dozenten Endpoints
+app.get('/api/dozenten', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const [rows] = await connection.query('SELECT * FROM dozenten');
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching lecturers:', error);
+    res.status(500).json({ error: 'Error fetching lecturers' });
+  } finally {
+    connection.release();
+  }
+});
+
+app.post('/api/dozenten', async (req, res) => {
+  const { vorname, nachname, email } = req.body;
+  
+  // Validate required fields
+  if (!vorname || !nachname || !email) {
+    return res.status(400).json({ 
+      error: 'Missing required fields',
+      details: 'Vorname, Nachname, and Email are required'
+    });
+  }
+
+  const connection = await pool.getConnection();
+  
+  try {
+    console.log('Creating new dozent:', { vorname, nachname, email });
+
+    // First, check if the table exists
+    const [tables] = await connection.query(
+      'SHOW TABLES LIKE ?',
+      ['dozenten']
+    );
+    
+    if (tables.length === 0) {
+      console.log('Creating dozenten table');
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS dozenten (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          vorname VARCHAR(255) NOT NULL,
+          nachname VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NOT NULL UNIQUE
+        )
+      `);
+    }
+
+    const [result] = await connection.query(
+      'INSERT INTO dozenten (vorname, nachname, email) VALUES (?, ?, ?)',
+      [vorname, nachname, email]
+    );
+    
+    console.log('Insert result:', result);
+    
+    const [newDozent] = await connection.query(
+      'SELECT * FROM dozenten WHERE id = ?',
+      [result.insertId]
+    );
+    
+    console.log('New dozent:', newDozent[0]);
+    res.status(201).json(newDozent[0]);
+  } catch (error) {
+    console.error('Detailed error creating lecturer:', error);
+    
+    // Check for duplicate email
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({
+        error: 'Duplicate email',
+        details: 'A lecturer with this email already exists'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Error creating lecturer',
+      details: error.message,
+      sqlMessage: error.sqlMessage,
+      sqlState: error.sqlState
+    });
+  } finally {
+    connection.release();
+  }
+});
+
+// Start the server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

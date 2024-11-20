@@ -2,17 +2,25 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/auth_service.dart';
+import 'services/theme_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/registration_screen.dart'; // Importiere die RegistrationScreen
+import 'screens/registration_screen.dart';
+import 'screens/main_wrapper.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final themeService = ThemeService(prefs);
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider.value(value: themeService),
       ],
       child: const TrainingCalendarApp(),
     ),
@@ -24,24 +32,27 @@ class TrainingCalendarApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Training Calendar',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      // Füge die Lokalisierungsdelegates und unterstützten Sprachen hinzu
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('de', 'DE'), // Deutsch
-      ],
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const AuthWrapper(),
-        '/register': (context) => const RegistrationScreen(),
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        return MaterialApp(
+          title: 'Training Calendar',
+          theme: themeService.currentTheme,
+          // Füge die Lokalisierungsdelegates und unterstützten Sprachen hinzu
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('de', 'DE'), // Deutsch
+          ],
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const MainWrapper(),
+            '/register': (context) => const RegistrationScreen(),
+            '/login': (context) => LoginScreen(),
+          },
+        );
       },
     );
   }
@@ -55,9 +66,9 @@ class AuthWrapper extends StatelessWidget {
     return Consumer<AuthService>(
       builder: (context, authService, _) {
         if (authService.isAuthenticated) {
-          return const HomeScreen(); // Entferne 'const' hier
+          return const HomeScreen();
         } else {
-          return LoginScreen(); // Entferne 'const' hier
+          return LoginScreen();
         }
       },
     );

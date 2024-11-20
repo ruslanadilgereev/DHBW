@@ -75,7 +75,7 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
- Future<void> register(
+  Future<void> register(
     String email,
     String password,
     String role,
@@ -104,5 +104,4 @@ class AuthService extends ChangeNotifier {
       throw Exception('Registrierung fehlgeschlagen');
     }
   }
-
 }

@@ -16,12 +16,17 @@ class LoginScreen extends StatelessWidget {
         emailController.text.trim(),
         passwordController.text.trim(),
       );
-      // Bei Erfolg wird automatisch zur HomeScreen navigiert
+      // After successful login, pop back to previous screen
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
       // Fehler anzeigen
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     }
   }
 
