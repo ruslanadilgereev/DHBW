@@ -9,6 +9,13 @@ import '../services/training_service.dart';
 
 enum CalendarView { Jahr, Monat, Woche, Liste, Gebucht }
 
+enum SortOption {
+  AlphabeticalAsc,
+  AlphabeticalDesc,
+  StartDateAsc,
+  StartDateDesc
+}
+
 class TrainingCalendarPage extends StatefulWidget {
   const TrainingCalendarPage({super.key});
 
@@ -25,31 +32,78 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   final TrainingService _trainingService = TrainingService();
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
+  final String backendUrl = 'http://localhost:3001/api';
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _tagController = TextEditingController();
+  final FocusNode _tagFocusNode = FocusNode();
+  List<String> _allTags = [];
+  List<String> _filteredTags = [];
+  List<String> _selectedTags = [];
+  bool _showTagSuggestions = false;
   final ScrollController _scrollController = ScrollController();
   Future<List<Map<String, dynamic>>>? _bookingsFuture;
+  List<Map<String, dynamic>> _lecturers = [];
+  SortOption _currentSortOption = SortOption.StartDateDesc;
+  late AuthService _authService;
 
   CalendarView _currentView = CalendarView.Monat;
   int _currentYear = DateTime.now().year;
-  bool _showWeekNumbers = false;
+  final bool _showWeekNumbers = false;
 
   @override
   void initState() {
     super.initState();
+    _tagFocusNode.addListener(() {
+      setState(() {
+        _showTagSuggestions = _tagFocusNode.hasFocus;
+      });
+    });
+    _searchController.addListener(() {
+      if (_searchController.text.isEmpty && _isSearching) {
+        setState(() {
+          _isSearching = false;
+          _searchResults.clear();
+        });
+      }
+    });
     _fetchTrainings();
+    _fetchTags();
+    _fetchLecturers();
+
+    // Initialize auth service and add listener
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      if (authService.isAuthenticated) {
-        _bookingsFuture = _fetchUserBookings();
+      _authService = Provider.of<AuthService>(context, listen: false);
+      _authService.addListener(_handleAuthStateChange);
+      if (_authService.isAuthenticated) {
+        _fetchUserBookings();
       }
     });
   }
 
   @override
   void dispose() {
+    _tagController.dispose();
     _searchController.dispose();
+    _tagFocusNode.dispose();
     _scrollController.dispose();
+    _authService.removeListener(_handleAuthStateChange);
     super.dispose();
+  }
+
+  void _handleAuthStateChange() {
+    setState(() {
+      if (!_authService.isAuthenticated) {
+        // Clear user-specific data when logged out
+        _userBookedTrainingIds.clear();
+        _bookingsFuture = null;
+        if (_currentView == CalendarView.Gebucht) {
+          _currentView = CalendarView.Monat;
+        }
+      } else {
+        // Refresh user bookings when logged in
+        _fetchUserBookings();
+      }
+    });
   }
 
   DateTime _normalizeDate(DateTime date) {
@@ -57,21 +111,32 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   }
 
   Future<void> _fetchTrainings() async {
-    final url = Uri.parse('http://localhost:3001/api/trainings');
+    final url = Uri.parse('$backendUrl/trainings');
+    print('Fetching trainings from $url');
 
     try {
       final response = await http.get(url);
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
+        print('Received ${data.length} trainings');
+
+        // Create a temporary map to store the new data
+        final Map<DateTime, List<Map<String, dynamic>>> newTrainings = {};
+
         setState(() {
-          _trainings.clear();
           for (var item in data) {
             final trainingName =
                 item['training_name'] ?? item['titel'] ?? 'Unbenannte Schulung';
             final trainingId = item['id'];
+            final int bookedCount = item['booked_count'] ?? 0;
 
-            // Zusätzliche Informationen abrufen
+            print('Processing training: $trainingName (ID: $trainingId)');
+            print('Booked count from backend: $bookedCount');
+            print('Dates from backend: ${item['sessions']}');
+
             final trainingInfo = {
               'id': trainingId,
               'name': trainingName,
@@ -82,40 +147,54 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
               'lecturerVorname': item['dozent_vorname'] ?? '',
               'lecturerNachname': item['dozent_nachname'] ?? '',
               'lecturerEmail': item['dozent_email'] ?? '',
-              'bookedCount': item['booked_count'] ?? 0,
+              'bookedCount': bookedCount,
               'is_multi_day': item['is_multi_day'] ?? false,
-              'start_date': item['start_date'] ?? '',
-              'end_date': item['end_date'] ?? '',
-              'dates': item['dates'] ?? [],
+              'start_date': item['gesamt_startdatum'] ?? '',
+              'end_date': item['gesamt_enddatum'] ?? '',
+              'dates': (item['sessions'] as List?)
+                      ?.map((session) => session['datum'])
+                      .toList() ??
+                  [],
+              'tags': item['tags'] ?? [],
             };
 
-            if (item['dates'] != null && item['dates'] is List) {
-              for (var dateString in item['dates']) {
+            print('Training info: $trainingInfo');
+
+            if (item['sessions'] != null && item['sessions'] is List) {
+              for (var session in item['sessions']) {
+                String dateString = session['datum'];
+                print('Processing date: $dateString');
                 DateTime rawDate = DateTime.parse(dateString).toLocal();
                 final trainingDate = _normalizeDate(rawDate);
-                _trainings
+                print('Normalized date: $trainingDate');
+                newTrainings
                     .putIfAbsent(trainingDate, () => [])
                     .add(trainingInfo);
               }
             }
           }
+
+          // Update the main trainings map with the new data
+          _trainings.clear();
+          _trainings.addAll(newTrainings);
+          print('Updated trainings map with ${_trainings.length} dates');
         });
       } else {
-        print('Fehler beim Laden der Schulungen: ${response.statusCode}');
+        print('Error loading trainings: ${response.statusCode}');
       }
     } catch (e) {
-      print('Fehler beim Abrufen der Schulungen: $e');
+      print('Error fetching trainings: $e');
     }
   }
 
   Future<List<Map<String, dynamic>>> _fetchUserBookings() async {
     int userId = Provider.of<AuthService>(context, listen: false).userId;
-    final url = Uri.parse('http://localhost:3001/api/users/$userId/bookings');
+    final url = Uri.parse('$backendUrl/users/$userId/bookings');
     print('Fetching bookings for user $userId from $url'); // Debug print
     try {
       final response = await http.get(url);
-      print('Response status: ${response.statusCode}'); // Debug print
-      print('Response body: ${response.body}'); // Debug print
+      print('Bookings response status: ${response.statusCode}');
+      print('Bookings response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -144,14 +223,15 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
             'is_multi_day': booking['is_multi_day'] ?? false,
             'start_date': booking['start_date'] ?? '',
             'end_date': booking['end_date'] ?? '',
+            'tags': booking['tags'] ?? [],
           };
         }).toList();
       } else {
-        print('Fehler beim Laden der Nutzerbuchungen: ${response.statusCode}');
+        print('Error loading user bookings: ${response.statusCode}');
         throw Exception('Failed to load user bookings');
       }
     } catch (e) {
-      print('Fehler beim Abrufen der Nutzerbuchungen: $e');
+      print('Error fetching user bookings: $e');
       throw Exception('Error: $e');
     }
   }
@@ -173,7 +253,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Fehler bei der Suche: $e')),
+        SnackBar(content: Text('Error searching trainings: $e')),
       );
     }
   }
@@ -181,7 +261,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   Future<void> _cancelBooking(int trainingId, String trainingName) async {
     int userId = Provider.of<AuthService>(context, listen: false).userId;
 
-    final url = Uri.parse('http://localhost:3001/api/bookings').replace(
+    final url = Uri.parse('$backendUrl/bookings').replace(
       queryParameters: {
         'user_id': userId.toString(),
         'training_id': trainingId.toString(),
@@ -204,7 +284,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Buchung für "$trainingName" wurde storniert'),
+              content: Text('Booking for "$trainingName" was cancelled'),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -214,7 +294,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Fehler beim Stornieren der Buchung: $e'),
+            content: Text('Error cancelling booking: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -223,56 +303,118 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   }
 
   Future<void> _bookTraining(int trainingId, String trainingName) async {
-    int userId = Provider.of<AuthService>(context, listen: false).userId;
-    final url = Uri.parse('http://localhost:3001/api/bookings');
+    // Show confirmation dialog
+    bool? shouldProceed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        bool sendEmail = true; // Default value for the checkbox
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Training buchen'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Möchten Sie dieses Training wirklich buchen?'),
+                  SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: sendEmail,
+                        onChanged: (bool? value) {
+                          setState(() {
+                            sendEmail = value ?? true;
+                          });
+                        },
+                      ),
+                      Text('Bestätigungs-E-Mail senden'),
+                    ],
+                  ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: Text('Abbrechen'),
+                  onPressed: () {
+                    Navigator.of(context).pop(false);
+                  },
+                ),
+                TextButton(
+                  child: Text('Buchen'),
+                  onPressed: () {
+                    Navigator.of(context).pop(sendEmail);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
 
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'user_id': userId,
-          'training_id': trainingId,
-        }),
-      );
+    if (shouldProceed != null) {
+      int userId = Provider.of<AuthService>(context, listen: false).userId;
+      final url = Uri.parse('$backendUrl/bookings');
 
-      if (response.statusCode == 201) {
-        setState(() {
-          _userBookedTrainingIds.add(trainingId);
-          // Reset the bookings future to trigger a refresh
-          _bookingsFuture = null;
-        });
+      try {
+        print('Booking training $trainingId for user $userId');
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'user_id': userId,
+            'training_id': trainingId,
+            'send_email': shouldProceed, // Add email preference to request
+          }),
+        );
 
-        // Refresh the trainings to update the booking counts
-        await _fetchTrainings();
+        print('Booking response status: ${response.statusCode}');
+        print('Booking response body: ${response.body}');
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Schulung "$trainingName" erfolgreich gebucht'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+        if (response.statusCode == 201) {
+          // Clear all cached data
+          setState(() {
+            _trainings.clear();
+            _userBookedTrainingIds.add(trainingId);
+            _bookingsFuture = null;
+          });
+
+          // Fetch fresh data
+          print('Fetching fresh data after booking...');
+          await _fetchTrainings();
+          _bookingsFuture = _fetchUserBookings();
+
+          // Force a rebuild of the UI
+          setState(() {});
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Training "$trainingName" booked successfully'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error booking training: ${response.body}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
-      } else {
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-                  Text('Fehler beim Buchen der Schulung: ${response.body}'),
+              content: Text('Error booking training: $e'),
               backgroundColor: Colors.red,
             ),
           );
         }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Fehler beim Buchen der Schulung: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -283,20 +425,19 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Anmeldung erforderlich'),
-          content: const Text(
-              'Um eine Schulung zu buchen, müssen Sie sich anmelden.'),
+          title: const Text('Login required'),
+          content: const Text('You need to be logged in to book a training.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Abbrechen'),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/login');
               },
-              child: const Text('Zur Anmeldung'),
+              child: const Text('Login'),
             ),
           ],
         ),
@@ -307,19 +448,19 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Training buchen'),
-        content: Text('Möchten Sie das Training "$trainingName" buchen?'),
+        title: const Text('Book training'),
+        content: Text('Do you want to book the training "$trainingName"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Abbrechen'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
               await _bookTraining(trainingId, trainingName);
             },
-            child: const Text('Buchen'),
+            child: const Text('Book'),
           ),
         ],
       ),
@@ -332,25 +473,93 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Buchung stornieren'),
+          title: const Text('Cancel booking'),
           content: Text(
-              'Möchten Sie die Buchung für "$trainingName" wirklich stornieren?'),
+              'Do you really want to cancel the booking for "$trainingName"?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Abbrechen'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _cancelBooking(trainingId, trainingName);
               },
-              child:
-                  const Text('Stornieren', style: TextStyle(color: Colors.red)),
+              child: const Text('Cancel', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
       },
+    );
+  }
+
+  List<Map<String, dynamic>> _filterTrainingsByTags(
+      List<Map<String, dynamic>> trainings) {
+    if (_selectedTags.isEmpty) {
+      return trainings;
+    }
+
+    final filtered = trainings.where((training) {
+      List<String> trainingTags = List<String>.from(training['tags'] ?? []);
+      final result = _selectedTags
+          .every((selectedTag) => trainingTags.contains(selectedTag));
+      return result;
+    }).toList();
+
+    return filtered;
+  }
+
+  int _getEventCount(DateTime day) {
+    final normalizedDate = _normalizeDate(day);
+    final trainingsForDay = _trainings[normalizedDate] ?? [];
+    final filteredTrainings = _filterTrainingsByTags(trainingsForDay);
+    return filteredTrainings.length;
+  }
+
+  Widget _buildTagFilterChips() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Filter by tags:',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _allTags.map((tag) {
+                final isSelected = _selectedTags.contains(tag);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: FilterChip(
+                    selected: isSelected,
+                    label: Text(tag),
+                    onSelected: (bool selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedTags.add(tag);
+                        } else {
+                          _selectedTags.remove(tag);
+                        }
+                      });
+                    },
+                    selectedColor:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    checkmarkColor: Theme.of(context).colorScheme.primary,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -501,13 +710,16 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
 
               final date = DateTime(month.year, month.month, dayNumber);
               final trainingsForDay = _trainings[_normalizeDate(date)] ?? [];
-              final hasTrainings = trainingsForDay.isNotEmpty;
+              final filteredTrainings = _filterTrainingsByTags(trainingsForDay);
+              final hasTrainings = filteredTrainings.isNotEmpty;
+              final hasBookedTraining = filteredTrainings.any((training) =>
+                  _userBookedTrainingIds.contains(training['id']));
 
               // Count single-day and multi-day trainings
               int singleDayCount = 0;
               Set<int> uniqueMultiDayTrainings = {};
 
-              for (var training in trainingsForDay) {
+              for (var training in filteredTrainings) {
                 List<dynamic> trainingDates = training['dates'] ?? [];
                 if (trainingDates.length > 1) {
                   uniqueMultiDayTrainings.add(training['id']);
@@ -527,6 +739,15 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                 },
                 child: Container(
                   padding: const EdgeInsets.all(4),
+                  decoration: hasBookedTraining
+                      ? BoxDecoration(
+                          border: Border.all(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        )
+                      : null,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -610,7 +831,8 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: theme.colorScheme.onSurfaceVariant,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -622,7 +844,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Heute',
+                      'Today',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -638,14 +860,18 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
             Expanded(
               child: TableCalendar(
                 firstDay: DateTime.utc(2023, 1, 1),
-                lastDay: DateTime.utc(2024, 12, 31),
+                lastDay: DateTime.utc(2030, 12, 31), // Extended to 2030
                 focusedDay: _focusedDay,
+                pageAnimationEnabled: false,
                 selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                 onDaySelected: (selectedDay, focusedDay) {
                   setState(() {
                     _selectedDay = selectedDay;
                     _focusedDay = focusedDay;
                   });
+                },
+                onPageChanged: (focusedDay) {
+                  _focusedDay = focusedDay;
                 },
                 calendarFormat: _currentView == CalendarView.Woche
                     ? CalendarFormat.week
@@ -672,7 +898,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                     shape: BoxShape.circle,
                   ),
                   todayTextStyle: TextStyle(
-                    color: theme.colorScheme.onBackground,
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                   ),
                   selectedTextStyle: TextStyle(
@@ -680,26 +906,114 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                     fontWeight: FontWeight.bold,
                   ),
                   defaultTextStyle: TextStyle(
-                    color: theme.colorScheme.onBackground,
+                    color: theme.colorScheme.onSurface,
                   ),
                   weekendTextStyle: TextStyle(
                     color: isDark ? Colors.red[300] : Colors.red[700],
                   ),
                   outsideTextStyle: TextStyle(
-                    color: theme.colorScheme.onBackground.withOpacity(0.5),
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
                   ),
                 ),
                 calendarBuilders: CalendarBuilders(
+                  defaultBuilder: (context, date, _) {
+                    final normalizedDay = _normalizeDate(date);
+                    final trainingsOnDay = _trainings[normalizedDay] ?? [];
+                    bool hasBookedTraining = trainingsOnDay.any((training) =>
+                        _userBookedTrainingIds.contains(training['id']));
+
+                    return Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: hasBookedTraining
+                          ? BoxDecoration(
+                              border: Border.all(
+                                color: Colors.red,
+                                width: 2,
+                              ),
+                              shape: BoxShape.circle,
+                            )
+                          : null,
+                      child: Center(
+                        child: Text(
+                          '${date.day}',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  selectedBuilder: (context, date, _) {
+                    final normalizedDay = _normalizeDate(date);
+                    final trainingsOnDay = _trainings[normalizedDay] ?? [];
+                    bool hasBookedTraining = trainingsOnDay.any((training) =>
+                        _userBookedTrainingIds.contains(training['id']));
+
+                    return Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        border: hasBookedTraining
+                            ? Border.all(
+                                color: Colors.red,
+                                width: 2,
+                              )
+                            : null,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${date.day}',
+                          style: TextStyle(
+                            color: theme.colorScheme.onPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  todayBuilder: (context, date, _) {
+                    final normalizedDay = _normalizeDate(date);
+                    final trainingsOnDay = _trainings[normalizedDay] ?? [];
+                    bool hasBookedTraining = trainingsOnDay.any((training) =>
+                        _userBookedTrainingIds.contains(training['id']));
+
+                    return Container(
+                      margin: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.3),
+                        border: Border.all(
+                          color: hasBookedTraining
+                              ? Colors.red
+                              : theme.colorScheme.primary,
+                          width: 2,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${date.day}',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                   markerBuilder: (context, date, events) {
                     final normalizedDay = _normalizeDate(date);
                     final trainingsOnDay = _trainings[normalizedDay] ?? [];
+                    // Apply tag filtering
+                    final filteredTrainings =
+                        _filterTrainingsByTags(trainingsOnDay);
 
-                    if (trainingsOnDay.isEmpty) return const SizedBox();
+                    if (filteredTrainings.isEmpty) return const SizedBox();
 
                     int singleDayCount = 0;
                     Set<int> uniqueMultiDayTrainings = {};
 
-                    for (var training in trainingsOnDay) {
+                    for (var training in filteredTrainings) {
                       List<dynamic> trainingDates = training['dates'] ?? [];
                       if (trainingDates.length > 1) {
                         uniqueMultiDayTrainings.add(training['id']);
@@ -728,7 +1042,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                               child: Center(
                                 child: Text(
                                   '$multiDayCount',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -748,7 +1062,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                               child: Center(
                                 child: Text(
                                   '$singleDayCount',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -761,6 +1075,10 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                     );
                   },
                 ),
+                eventLoader: (day) {
+                  final count = _getEventCount(day);
+                  return count > 0 ? [1] : [];
+                },
                 startingDayOfWeek: StartingDayOfWeek.monday,
               ),
             ),
@@ -798,7 +1116,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     ].where((s) => s.isNotEmpty).join(' ');
     final String lecturerEmail = training['lecturerEmail'] ?? '';
 
-    List<DateBlock> _getDateBlocks(List<String> dates) {
+    List<DateBlock> getDateBlocks(List<String> dates) {
       List<DateBlock> blocks = [];
       DateTime? startDate;
       DateTime? endDate;
@@ -812,7 +1130,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
           if (rawDate.difference(endDate!).inDays == 1) {
             endDate = rawDate;
           } else {
-            blocks.add(DateBlock(startDate!, endDate!));
+            blocks.add(DateBlock(startDate, endDate));
             startDate = rawDate;
             endDate = rawDate;
           }
@@ -861,7 +1179,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                     formatDateRange(),
                     style: TextStyle(
                       fontSize: 14,
-                      color: theme.colorScheme.onBackground,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -889,7 +1207,8 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
         ),
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -897,7 +1216,8 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                 Container(
                   padding: const EdgeInsets.all(12.0),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withOpacity(0.5),
                     borderRadius: BorderRadius.circular(8.0),
                   ),
                   child: Column(
@@ -943,8 +1263,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                         ],
                       ],
                       if (training['location'] != null) ...[
-                        if (lecturerInfo.isNotEmpty)
-                          const SizedBox(height: 8),
+                        if (lecturerInfo.isNotEmpty) const SizedBox(height: 8),
                         Row(
                           children: [
                             Icon(Icons.location_on,
@@ -989,7 +1308,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                 Wrap(
                   spacing: 8.0,
                   runSpacing: 8.0,
-                  children: _getDateBlocks(dates)
+                  children: getDateBlocks(dates)
                       .map((block) => Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
@@ -997,20 +1316,43 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                               color: theme.colorScheme.primary.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: theme.colorScheme.primary.withOpacity(0.3),
+                                color: theme.colorScheme.primary,
                               ),
                             ),
                             child: Text(
                               '${block.dates.length} Termine\nVon: ${DateFormat('dd.MM.yyyy').format(block.startDate)}\nBis: ${DateFormat('dd.MM.yyyy').format(block.endDate)}',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: theme.colorScheme.onBackground,
+                                color: theme.colorScheme.onSurface,
                                 height: 1.5,
                               ),
                             ),
                           ))
                       .toList(),
                 ),
+                if (training['tags'] != null &&
+                    (training['tags'] as List).isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Tags:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: (training['tags'] as List)
+                        .map<Widget>((tag) => Chip(
+                              label: Text(tag.toString()),
+                              backgroundColor:
+                                  theme.colorScheme.secondaryContainer,
+                              labelStyle: TextStyle(
+                                color: theme.colorScheme.onSecondaryContainer,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -1069,6 +1411,9 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     List<Map<String, dynamic>> trainingsForSelectedDay =
         _trainings[_normalizeDate(_selectedDay)] ?? [];
 
+    // Apply tag filtering
+    trainingsForSelectedDay = _filterTrainingsByTags(trainingsForSelectedDay);
+
     // Sort trainings alphabetically by name
     trainingsForSelectedDay.sort((a, b) => (a['name'] ?? '')
         .toString()
@@ -1114,41 +1459,956 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   }
 
   Widget _buildListView() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _fetchAllTrainings(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    if (_isSearching) {
+      return _buildSearchResults();
+    }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Text('Fehler beim Laden der Schulungen: ${snapshot.error}'),
-          );
-        }
+    // Get all trainings and sort them by date
+    List<Map<String, dynamic>> allTrainings = [];
+    _trainings.forEach((date, trainingsForDate) {
+      allTrainings.addAll(trainingsForDate);
+    });
 
-        final trainings = snapshot.data ?? [];
+    // Apply tag filtering to the full list
+    allTrainings = _filterTrainingsByTags(allTrainings);
 
-        // Sort all trainings alphabetically
-        trainings.sort((a, b) => (a['name'] ?? '')
+    // Deduplicate trainings based on ID
+    final Map<int, Map<String, dynamic>> uniqueTrainings = {};
+    for (var training in allTrainings) {
+      uniqueTrainings[training['id']] = training;
+    }
+    allTrainings = uniqueTrainings.values.toList();
+
+    // Sort trainings based on selected option
+    switch (_currentSortOption) {
+      case SortOption.AlphabeticalAsc:
+        allTrainings.sort((a, b) => (a['name'] ?? '')
             .toString()
             .toLowerCase()
             .compareTo((b['name'] ?? '').toString().toLowerCase()));
+        break;
+      case SortOption.AlphabeticalDesc:
+        allTrainings.sort((a, b) => (b['name'] ?? '')
+            .toString()
+            .toLowerCase()
+            .compareTo((a['name'] ?? '').toString().toLowerCase()));
+        break;
+      case SortOption.StartDateAsc:
+        allTrainings.sort((a, b) {
+          final aDate = a['start_date'] != null && a['start_date'].isNotEmpty
+              ? DateTime.parse(a['start_date'])
+              : DateTime.parse(a['dates'][0]);
+          final bDate = b['start_date'] != null && b['start_date'].isNotEmpty
+              ? DateTime.parse(b['start_date'])
+              : DateTime.parse(b['dates'][0]);
+          return aDate.compareTo(bDate);
+        });
+        break;
+      case SortOption.StartDateDesc:
+        allTrainings.sort((a, b) {
+          final aDate = a['start_date'] != null && a['start_date'].isNotEmpty
+              ? DateTime.parse(a['start_date'])
+              : DateTime.parse(a['dates'][0]);
+          final bDate = b['start_date'] != null && b['start_date'].isNotEmpty
+              ? DateTime.parse(b['start_date'])
+              : DateTime.parse(b['dates'][0]);
+          return bDate.compareTo(aDate);
+        });
+        break;
+    }
 
-        if (trainings.isEmpty) {
-          return const Center(child: Text('Keine Schulungen verfügbar'));
-        }
+    if (allTrainings.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.event_busy,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _selectedTags.isEmpty
+                  ? 'Keine Schulungen verfügbar'
+                  : 'Keine Schulungen mit den ausgewählten Tags gefunden',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
 
-        return ListView.builder(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Sorting dropdown
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              const Text('Sortieren nach: '),
+              DropdownButton<SortOption>(
+                value: _currentSortOption,
+                items: [
+                  DropdownMenuItem(
+                    value: SortOption.StartDateDesc,
+                    child: Row(
+                      children: const [
+                        Icon(Icons.calendar_today, size: 16),
+                        SizedBox(width: 8),
+                        Text('Startdatum (neueste zuerst)'),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: SortOption.StartDateAsc,
+                    child: Row(
+                      children: const [
+                        Icon(Icons.calendar_today, size: 16),
+                        SizedBox(width: 8),
+                        Text('Startdatum (älteste zuerst)'),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: SortOption.AlphabeticalAsc,
+                    child: Row(
+                      children: const [
+                        Icon(Icons.sort_by_alpha, size: 16),
+                        SizedBox(width: 8),
+                        Text('Alphabetisch (A-Z)'),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: SortOption.AlphabeticalDesc,
+                    child: Row(
+                      children: const [
+                        Icon(Icons.sort_by_alpha, size: 16),
+                        SizedBox(width: 8),
+                        Text('Alphabetisch (Z-A)'),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (SortOption? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _currentSortOption = newValue;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        // Training list
+        ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: trainings.length,
+          itemCount: allTrainings.length,
           itemBuilder: (context, index) {
-            final training = trainings[index];
-            return _buildTrainingCard(training);
+            return _buildTrainingCard(allTrainings[index]);
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchAllTrainings() async {
+    final url = Uri.parse('$backendUrl/trainings');
+    try {
+      final response = await http.get(url);
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map<Map<String, dynamic>>((item) {
+          final List<dynamic> dates = item['dates'] ?? [];
+          return {
+            'id': item['id'],
+            'name':
+                item['training_name'] ?? item['titel'] ?? 'Unbenannte Schulung',
+            'description': item['beschreibung'] ?? 'Keine Beschreibung',
+            'location': item['ort'] ?? 'Kein Ort angegeben',
+            'maxParticipants': item['max_teilnehmer'] ?? 0,
+            'lecturerId': item['dozent_id'] ?? 'Keine Angabe',
+            'lecturerVorname': item['dozent_vorname'] ?? '',
+            'lecturerNachname': item['dozent_nachname'] ?? '',
+            'lecturerEmail': item['dozent_email'] ?? '',
+            'bookedCount': item['booked_count'] ?? 0,
+            'dates': dates,
+            'is_multi_day': dates.length > 1,
+            'start_date': item['start_date'] ?? '',
+            'end_date': item['end_date'] ?? '',
+            'tags': item['tags'] ?? [],
+          };
+        }).toList();
+      } else {
+        print('Error loading trainings: ${response.statusCode}');
+        throw Exception('Failed to load trainings');
+      }
+    } catch (e) {
+      print('Error fetching trainings: $e');
+      throw Exception('Error: $e');
+    }
+  }
+
+  Future<void> _fetchTags() async {
+    print('Starting to fetch tags...'); // Debug print
+    try {
+      final response = await http.get(Uri.parse('$backendUrl/tags'));
+      print('Tags response status: ${response.statusCode}'); // Debug print
+      print('Tags response body: ${response.body}'); // Debug print
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        print('Parsed data: $data'); // Debug print
+        setState(() {
+          _allTags = data.map((tag) => tag['name'] as String).toList();
+          _filteredTags = List.from(_allTags);
+          _showTagSuggestions = true;
+          print('Set _allTags to: $_allTags'); // Debug print
+          print('Set _filteredTags to: $_filteredTags'); // Debug print
+          print(
+              'Set _showTagSuggestions to: $_showTagSuggestions'); // Debug print
+        });
+      }
+    } catch (e) {
+      print('Error fetching tags: $e'); // Debug print
+    }
+  }
+
+  void _filterTags(String query) {
+    print('Filtering tags. Query: "$query"'); // Debug print
+    print('All tags before filter: $_allTags'); // Debug print
+    setState(() {
+      if (query.isEmpty) {
+        _filteredTags = List.from(_allTags);
+      } else {
+        _filteredTags = _allTags
+            .where((tag) => tag.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+      _showTagSuggestions = true;
+      print('Filtered tags: $_filteredTags'); // Debug print
+      print('Show suggestions: $_showTagSuggestions'); // Debug print
+    });
+  }
+
+  Future<void> _fetchLecturers() async {
+    try {
+      final response = await http.get(Uri.parse('$backendUrl/dozenten'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        setState(() {
+          _lecturers = List<Map<String, dynamic>>.from(data);
+        });
+      } else {
+        print('Error fetching lecturers: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching lecturers: $e');
+    }
+  }
+
+  void _handleTagSelection(String tag) {
+    if (!_selectedTags.contains(tag)) {
+      setState(() {
+        _selectedTags.add(tag);
+        _tagController.clear();
+        _showTagSuggestions = false;
+      });
+    }
+  }
+
+  Widget _buildTagInput() {
+    print('Building tag input'); // Debug print
+    print('_showTagSuggestions: $_showTagSuggestions'); // Debug print
+    print('_allTags: $_allTags'); // Debug print
+    print('_filteredTags: $_filteredTags'); // Debug print
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_selectedTags.isNotEmpty) ...[
+              const Text(
+                'Ausgewählte Tags:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: _selectedTags
+                    .map((tag) => Chip(
+                          label: Text(tag),
+                          onDeleted: () {
+                            setState(() {
+                              _selectedTags.remove(tag);
+                            });
+                          },
+                        ))
+                    .toList(),
+              ),
+            ],
+            TextField(
+              controller: _tagController,
+              focusNode: _tagFocusNode,
+              decoration: InputDecoration(
+                labelText: 'Tags',
+                hintText: 'Tag eingeben oder aus Liste wählen',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () {
+                    if (_tagController.text.isNotEmpty) {
+                      _handleTagSelection(_tagController.text);
+                    }
+                  },
+                ),
+              ),
+              onTap: () {
+                setState(() {
+                  _showTagSuggestions = true;
+                });
+              },
+              onChanged: (value) {
+                _filterTags(value);
+              },
+              onSubmitted: (value) {
+                if (value.isNotEmpty) {
+                  _handleTagSelection(value);
+                }
+              },
+            ),
+            if (_allTags.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Verfügbare Tags:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                constraints: const BoxConstraints(maxHeight: 150),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _filteredTags.length,
+                  itemBuilder: (context, index) {
+                    final tag = _filteredTags[index];
+                    final isSelected = _selectedTags.contains(tag);
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        tag,
+                        style: TextStyle(
+                          color: isSelected
+                              ? Theme.of(context).disabledColor
+                              : null,
+                        ),
+                      ),
+                      trailing: isSelected ? const Icon(Icons.check) : null,
+                      onTap: () {
+                        if (!isSelected) {
+                          _handleTagSelection(tag);
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAddTrainingDialog(BuildContext context) {
+    String trainingName = '';
+    String description = '';
+    String location = '';
+    int maxParticipants = 0;
+    int? selectedLecturerId;
+    DateTime? selectedDate;
+    TimeOfDay? startTime;
+    TimeOfDay? endTime;
+
+    // Reset tag-related state
+    _tagController.clear();
+    setState(() {
+      _selectedTags = [];
+      _filteredTags = List.from(_allTags);
+      _showTagSuggestions = false;
+    });
+
+    // Fetch fresh tags
+    _fetchTags().then((_) {
+      print('Tags fetched for dialog: $_allTags'); // Debug print
+    });
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            print('Dialog rebuilding with tags: $_allTags'); // Debug print
+            return AlertDialog(
+              title: const Text('Neue Schulung erstellen'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      decoration: const InputDecoration(labelText: 'Name'),
+                      onChanged: (value) => trainingName = value,
+                    ),
+                    TextField(
+                      decoration:
+                          const InputDecoration(labelText: 'Beschreibung'),
+                      onChanged: (value) => description = value,
+                    ),
+                    TextField(
+                      decoration: const InputDecoration(labelText: 'Ort'),
+                      onChanged: (value) => location = value,
+                    ),
+                    TextField(
+                      decoration: const InputDecoration(
+                          labelText: 'Maximale Teilnehmerzahl'),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) =>
+                          maxParticipants = int.tryParse(value) ?? 0,
+                    ),
+                    DropdownButtonFormField<int>(
+                      decoration: const InputDecoration(labelText: 'Dozent'),
+                      value: selectedLecturerId,
+                      items: _lecturers.map((lecturer) {
+                        return DropdownMenuItem<int>(
+                          value: lecturer['id'] as int,
+                          child: Text(
+                              '${lecturer['vorname']} ${lecturer['nachname']}'),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedLecturerId = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Tag input section
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_selectedTags.isNotEmpty) ...[
+                          const Text(
+                            'Ausgewählte Tags:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 8.0,
+                            runSpacing: 4.0,
+                            children: _selectedTags
+                                .map((tag) => Chip(
+                                      label: Text(tag),
+                                      onDeleted: () {
+                                        setDialogState(() {
+                                          _selectedTags.remove(tag);
+                                        });
+                                      },
+                                    ))
+                                .toList(),
+                          ),
+                        ],
+                        TextField(
+                          controller: _tagController,
+                          focusNode: _tagFocusNode,
+                          decoration: InputDecoration(
+                            labelText: 'Tags',
+                            hintText: 'Tag eingeben oder aus Liste wählen',
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.add),
+                              onPressed: () {
+                                if (_tagController.text.isNotEmpty) {
+                                  final newTag = _tagController.text;
+                                  setDialogState(() {
+                                    if (!_selectedTags.contains(newTag)) {
+                                      _selectedTags.add(newTag);
+                                      _tagController.clear();
+                                    }
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          onTap: () {
+                            setDialogState(() {
+                              _showTagSuggestions = true;
+                            });
+                          },
+                        ),
+                        if (_allTags.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Verfügbare Tags:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).cardColor,
+                              border: Border.all(
+                                  color: Theme.of(context).dividerColor),
+                              borderRadius: BorderRadius.circular(4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            constraints: const BoxConstraints(maxHeight: 150),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: _allTags.length,
+                              itemBuilder: (context, index) {
+                                final tag = _allTags[index];
+                                final isSelected = _selectedTags.contains(tag);
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(
+                                    tag,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Theme.of(context).disabledColor
+                                          : null,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check)
+                                      : null,
+                                  onTap: () {
+                                    if (!isSelected) {
+                                      _handleTagSelection(tag);
+                                    }
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                initialDate: DateTime.now(),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now()
+                                    .add(const Duration(days: 365)),
+                              );
+                              if (date != null) {
+                                setDialogState(() {
+                                  selectedDate = date;
+                                });
+                              }
+                            },
+                            child: Text(selectedDate == null
+                                ? 'Datum wählen'
+                                : DateFormat('dd.MM.yyyy')
+                                    .format(selectedDate!)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () async {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.now(),
+                              );
+                              if (time != null) {
+                                setDialogState(() {
+                                  startTime = time;
+                                });
+                              }
+                            },
+                            child: Text(startTime == null
+                                ? 'Startzeit wählen'
+                                : startTime!.format(context)),
+                          ),
+                        ),
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () async {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.now(),
+                              );
+                              if (time != null) {
+                                setDialogState(() {
+                                  endTime = time;
+                                });
+                              }
+                            },
+                            child: Text(endTime == null
+                                ? 'Endzeit wählen'
+                                : endTime!.format(context)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTagInput(),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Abbrechen'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (trainingName.isEmpty ||
+                        selectedDate == null ||
+                        startTime == null ||
+                        endTime == null ||
+                        selectedLecturerId == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content:
+                              Text('Bitte füllen Sie alle Pflichtfelder aus.'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final training = {
+                      'titel': trainingName,
+                      'beschreibung': description,
+                      'ort': location,
+                      'max_teilnehmer': maxParticipants,
+                      'dozent_id': selectedLecturerId,
+                      'tags': _selectedTags,
+                      'sessions': [
+                        {
+                          'datum':
+                              DateFormat('yyyy-MM-dd').format(selectedDate!),
+                          'startzeit':
+                              '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}:00',
+                          'endzeit':
+                              '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}:00',
+                          'typ': 'normal',
+                        }
+                      ],
+                    };
+
+                    try {
+                      final response = await http.post(
+                        Uri.parse('$backendUrl/trainings'),
+                        headers: {'Content-Type': 'application/json'},
+                        body: json.encode(training),
+                      );
+
+                      if (response.statusCode == 201) {
+                        if (mounted) {
+                          Navigator.of(context).pop();
+                          _fetchTrainings();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Schulung erfolgreich erstellt'),
+                            ),
+                          );
+                        }
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  'Fehler beim Erstellen der Schulung: ${response.body}'),
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content:
+                                Text('Fehler beim Erstellen der Schulung: $e'),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Erstellen'),
+                ),
+              ],
+            );
           },
         );
       },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Check if we're on a wider screen (web browser)
+        final isWideScreen = constraints.maxWidth > 600;
+
+        return Padding(
+          // Doubled padding for web browsers
+          padding: EdgeInsets.symmetric(
+            horizontal: isWideScreen ? 96.0 : 0.0,
+          ),
+          child: Column(
+            children: [
+              _buildTagFilterChips(),
+              // Search Section with elevated design
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 16.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).shadowColor.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Schulungen suchen...',
+                      hintStyle: TextStyle(
+                        color: Theme.of(context).hintColor,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                _searchTrainings('');
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: BorderSide(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.5),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surface,
+                    ),
+                    onChanged: (value) => _searchTrainings(value),
+                  ),
+                ),
+              ),
+              // Toggle Buttons with improved styling
+              Container(
+                margin: const EdgeInsets.only(bottom: 16.0),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).shadowColor.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildViewButton(CalendarView.Jahr, 'Jahr',
+                            Icons.calendar_view_month),
+                        _buildViewButton(
+                            CalendarView.Monat, 'Monat', Icons.calendar_today),
+                        _buildViewButton(
+                            CalendarView.Woche, 'Woche', Icons.view_week),
+                        _buildViewButton(
+                            CalendarView.Liste, 'Liste', Icons.view_list),
+                        _buildViewButton(
+                            CalendarView.Gebucht, 'Gebucht', Icons.bookmark),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Content area with subtle background
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).shadowColor.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      child: Column(
+                        children: [
+                          if (_isSearching)
+                            _buildSearchResults()
+                          else if (_currentView == CalendarView.Jahr)
+                            _buildYearView()
+                          else if (_currentView == CalendarView.Liste)
+                            _buildListView()
+                          else if (_currentView == CalendarView.Gebucht)
+                            _buildBookedTrainingsView()
+                          else
+                            _buildCalendarView(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildViewButton(CalendarView view, String label, IconData icon) {
+    final isSelected = _currentView == view;
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {
+            setState(() {
+              _currentView = view;
+              if (view == CalendarView.Woche) {
+                _calendarFormat = CalendarFormat.week;
+              } else if (view == CalendarView.Monat) {
+                _calendarFormat = CalendarFormat.month;
+              }
+            });
+          },
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? theme.colorScheme.primaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: isSelected
+                      ? theme.colorScheme.onPrimaryContainer
+                      : theme.colorScheme.onSurface,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onSurface,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1228,9 +2488,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       );
     }
 
-    if (_bookingsFuture == null) {
-      _bookingsFuture = _fetchUserBookings();
-    }
+    _bookingsFuture ??= _fetchUserBookings();
 
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _bookingsFuture,
@@ -1300,248 +2558,6 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
           ),
         );
       },
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchAllTrainings() async {
-    final url = Uri.parse('http://localhost:3001/api/trainings');
-    try {
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map<Map<String, dynamic>>((item) {
-          final List<dynamic> dates = item['dates'] ?? [];
-          return {
-            'id': item['id'],
-            'name':
-                item['training_name'] ?? item['titel'] ?? 'Unbenannte Schulung',
-            'description': item['beschreibung'] ?? 'Keine Beschreibung',
-            'location': item['ort'] ?? 'Kein Ort angegeben',
-            'maxParticipants': item['max_teilnehmer'] ?? 0,
-            'lecturerId': item['dozent_id'] ?? 'Keine Angabe',
-            'lecturerVorname': item['dozent_vorname'] ?? '',
-            'lecturerNachname': item['dozent_nachname'] ?? '',
-            'lecturerEmail': item['dozent_email'] ?? '',
-            'bookedCount': item['booked_count'] ?? 0,
-            'dates': dates,
-            'is_multi_day': dates.length > 1,
-            'start_date': item['start_date'] ?? '',
-            'end_date': item['end_date'] ?? '',
-          };
-        }).toList();
-      } else {
-        print('Error loading trainings: ${response.statusCode}');
-        throw Exception('Failed to load trainings');
-      }
-    } catch (e) {
-      print('Error fetching trainings: $e');
-      throw Exception('Error: $e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Check if we're on a wider screen (web browser)
-        final isWideScreen = constraints.maxWidth > 600;
-
-        return Padding(
-          // Doubled padding for web browsers
-          padding: EdgeInsets.symmetric(
-            horizontal: isWideScreen ? 96.0 : 0.0,
-          ),
-          child: Column(
-            children: [
-              // Search Section with elevated design
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 16.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).shadowColor.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Schulungen suchen...',
-                      hintStyle: TextStyle(
-                        color: Theme.of(context).hintColor,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                _searchTrainings('');
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                          width: 2,
-                        ),
-                      ),
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.surface,
-                    ),
-                    onChanged: (value) => _searchTrainings(value),
-                  ),
-                ),
-              ),
-              // Toggle Buttons with improved styling
-              Container(
-                margin: const EdgeInsets.only(bottom: 16.0),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context).shadowColor.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildViewButton(CalendarView.Jahr, 'Jahr', Icons.calendar_view_month),
-                        _buildViewButton(CalendarView.Monat, 'Monat', Icons.calendar_today),
-                        _buildViewButton(CalendarView.Woche, 'Woche', Icons.view_week),
-                        _buildViewButton(CalendarView.Liste, 'Liste', Icons.view_list),
-                        _buildViewButton(CalendarView.Gebucht, 'Gebucht', Icons.bookmark),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Content area with subtle background
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context).shadowColor.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      child: Column(
-                        children: [
-                          if (_isSearching)
-                            _buildSearchResults()
-                          else if (_currentView == CalendarView.Jahr)
-                            _buildYearView()
-                          else if (_currentView == CalendarView.Liste)
-                            _buildListView()
-                          else if (_currentView == CalendarView.Gebucht)
-                            _buildBookedTrainingsView()
-                          else
-                            _buildCalendarView(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildViewButton(CalendarView view, String label, IconData icon) {
-    final isSelected = _currentView == view;
-    final theme = Theme.of(context);
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () {
-            setState(() {
-              _currentView = view;
-              if (view == CalendarView.Woche) {
-                _calendarFormat = CalendarFormat.week;
-              } else if (view == CalendarView.Monat) {
-                _calendarFormat = CalendarFormat.month;
-              }
-            });
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            decoration: BoxDecoration(
-              color: isSelected 
-                  ? theme.colorScheme.primaryContainer
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 20,
-                  color: isSelected 
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurface,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected 
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onSurface,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

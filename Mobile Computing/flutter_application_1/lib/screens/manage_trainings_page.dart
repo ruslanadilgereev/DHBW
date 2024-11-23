@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/lecturer_service.dart';
+import '../services/tag_service.dart';
 
 class ManageTrainingsPage extends StatefulWidget {
   const ManageTrainingsPage({super.key});
@@ -13,12 +14,17 @@ class ManageTrainingsPage extends StatefulWidget {
 class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
   List<dynamic> trainings = [];
   final LecturerService _lecturerService = LecturerService();
+  final TagService _tagService = TagService();
   List<Lecturer> _lecturers = [];
   Lecturer? _selectedLecturer;
+  List<String> _tags = [];
+  List<Tag> _tagSuggestions = [];
+  final TextEditingController _tagController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    print('ManageTrainingsPage initState called');
     fetchTrainings();
     _fetchLecturers();
   }
@@ -46,18 +52,27 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
   }
 
   Future<void> fetchTrainings() async {
+    print('Fetching trainings...');
     try {
       final response =
           await http.get(Uri.parse('http://localhost:3001/api/trainings'));
+      print('API Response status: ${response.statusCode}');
+      print('API Response body: ${response.body}');
+
       if (response.statusCode == 200) {
+        final List<dynamic> jsonData = json.decode(response.body);
+        print('Decoded JSON data: $jsonData');
+
         setState(() {
-          trainings = json.decode(response.body);
+          trainings =
+              jsonData.map((json) => json as Map<String, dynamic>).toList();
         });
+        print('Updated trainings state: $trainings');
       } else {
-        showErrorSnackbar('Fehler beim Laden der Schulungen');
+        print('Failed to fetch trainings. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      showErrorSnackbar('Fehler: $e');
+      print('Error fetching trainings: $e');
     }
   }
 
@@ -66,7 +81,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     List<DateTime> selectedDates = [];
     List<DateTimeRange> pauses = [];
 
-    // Neue Controller für die zusätzlichen Eingabefelder
+    // Controllers for input fields
     TextEditingController nameController = TextEditingController();
     TextEditingController descriptionController = TextEditingController();
     TextEditingController locationController = TextEditingController();
@@ -105,6 +120,148 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                       decoration: const InputDecoration(
                           labelText: 'Maximale Teilnehmerzahl'),
                       keyboardType: TextInputType.number,
+                    ),
+                    Column(
+                      children: [
+                        TextField(
+                          controller: _tagController,
+                          decoration: const InputDecoration(
+                            labelText: 'Tags',
+                            hintText:
+                                'Tippen Sie, um Tags zu suchen oder neue zu erstellen',
+                          ),
+                          onChanged: (value) async {
+                            List<Tag> suggestions;
+                            if (value.isEmpty) {
+                              suggestions = await _tagService.getAllTags();
+                            } else {
+                              suggestions = await _tagService.searchTags(value);
+                            }
+                            setDialogState(() {
+                              _tagSuggestions = suggestions;
+                            });
+                            print(
+                                'Tag suggestions updated: ${suggestions.length}'); // Debug print
+                          },
+                          onSubmitted: (value) {
+                            if (value.isNotEmpty) {
+                              setDialogState(() {
+                                if (!_tags.contains(value)) {
+                                  _tags.add(value);
+                                }
+                              });
+                              _tagController.clear();
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        FutureBuilder<List<Tag>>(
+                          future: _tagService.getAllTags(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const CircularProgressIndicator();
+                            }
+
+                            final availableTags = _tagSuggestions.isEmpty
+                                ? (snapshot.data ?? [])
+                                : _tagSuggestions;
+
+                            if (availableTags.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 8.0, bottom: 4.0),
+                                  child: Text(
+                                    'Verfügbare Tags:',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ),
+                                Wrap(
+                                  spacing: 8.0,
+                                  runSpacing: 4.0,
+                                  children: availableTags
+                                      .map((tag) => ActionChip(
+                                            label: Text(tag.name),
+                                            backgroundColor: _tags
+                                                    .contains(tag.name)
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                                : Theme.of(context)
+                                                    .colorScheme
+                                                    .surfaceContainerHighest,
+                                            labelStyle: TextStyle(
+                                              color: _tags.contains(tag.name)
+                                                  ? Theme.of(context)
+                                                      .colorScheme
+                                                      .onPrimary
+                                                  : Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                            ),
+                                            onPressed: () {
+                                              setDialogState(() {
+                                                if (!_tags.contains(tag.name)) {
+                                                  _tags.add(tag.name);
+                                                  print(
+                                                      'Added tag: ${tag.name}'); // Debug print
+                                                }
+                                              });
+                                            },
+                                          ))
+                                      .toList(),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        if (_tags.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(left: 8.0, bottom: 4.0),
+                            child: Text(
+                              'Ausgewählte Tags:',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                          Wrap(
+                            spacing: 8.0,
+                            runSpacing: 4.0,
+                            children: _tags
+                                .map((tag) => Chip(
+                                      label: Text(tag),
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer,
+                                      labelStyle: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimaryContainer),
+                                      deleteIcon: Icon(
+                                        Icons.cancel,
+                                        size: 18,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimaryContainer,
+                                      ),
+                                      onDeleted: () {
+                                        setDialogState(() {
+                                          _tags.remove(tag);
+                                        });
+                                      },
+                                    ))
+                                .toList(),
+                          ),
+                        ],
+                      ],
                     ),
                     Row(
                       children: [
@@ -398,6 +555,43 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     return dates;
   }
 
+  Future<List<int>> _createTags(List<String> tagNames) async {
+    List<int> tagIds = [];
+
+    for (String tagName in tagNames) {
+      try {
+        final response = await http.post(
+          Uri.parse('http://localhost:3001/api/tags'),
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+          body: jsonEncode(<String, dynamic>{
+            'name': tagName,
+            'create_time': DateTime.now().toIso8601String(),
+          }),
+        );
+
+        if (response.statusCode == 201) {
+          final Map<String, dynamic> data = json.decode(response.body);
+          tagIds.add(data['id']);
+        } else if (response.statusCode == 409) {
+          // Tag already exists, get its ID
+          final existingTagResponse = await http.get(
+            Uri.parse('http://localhost:3001/api/tags/byName/$tagName'),
+          );
+          if (existingTagResponse.statusCode == 200) {
+            final Map<String, dynamic> data =
+                json.decode(existingTagResponse.body);
+            tagIds.add(data['id']);
+          }
+        }
+      } catch (e) {
+        print('Error creating tag $tagName: $e');
+      }
+    }
+    return tagIds;
+  }
+
   // Aktualisierte addTraining-Funktion
   Future<void> addTraining(
     String name,
@@ -409,6 +603,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     int lecturerId,
   ) async {
     try {
+      final tagIds = await _createTags(_tags);
       final response = await http.post(
         Uri.parse('http://localhost:3001/api/trainings'),
         headers: <String, String>{
@@ -420,6 +615,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
           'location': location,
           'max_participants': maxParticipants,
           'lecturer_id': lecturerId,
+          'tags': tagIds,
           'dates': dates
               .map((date) => date.toIso8601String().split('T').first)
               .toList(),
@@ -433,6 +629,9 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
       );
 
       if (response.statusCode == 201) {
+        setState(() {
+          _tags = []; // Clear tags after successful creation
+        });
         fetchTrainings();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Schulung hinzugefügt')),
@@ -446,6 +645,22 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Fehler: $e')),
       );
+    }
+  }
+
+  Future<void> _deleteTraining(int trainingId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('http://localhost:3001/api/trainings/$trainingId'),
+      );
+      if (response.statusCode == 200) {
+        fetchTrainings();
+        showSuccessSnackbar('Schulung gelöscht');
+      } else {
+        showErrorSnackbar('Fehler beim Löschen der Schulung');
+      }
+    } catch (e) {
+      showErrorSnackbar('Fehler: $e');
     }
   }
 
@@ -464,7 +679,6 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Container(
-                // Definieren Sie die gewünschte Höhe und Breite
                 height: MediaQuery.of(context).size.height * 0.6,
                 width: MediaQuery.of(context).size.width * 0.8,
                 padding: const EdgeInsets.all(16.0),
@@ -533,12 +747,64 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     }
   }
 
+  void showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  void showSuccessSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   Widget buildTrainingItem(dynamic training) {
+    print('Building training item: $training'); // Debug log
+
+    // Get dates from sessions instead of 'dates' field
     final List<dynamic> dates = (training['dates'] as List?) ?? [];
     final bool isMultiDay = dates.length > 1;
     final int maxParticipants = training['max_teilnehmer'] ?? 0;
     final int bookedCount = training['booked_count'] ?? 0;
     final int availableSpots = maxParticipants - bookedCount;
+    final String startDate = training['start_date'] ?? '';
+    final String endDate = training['end_date'] ?? '';
+
+    String formatDateRange() {
+      if (dates.isEmpty) return 'Keine Termine';
+      if (dates.length == 1)
+        return 'Am ${_formatDate(DateTime.parse(dates[0]))}';
+      return 'Von ${_formatDate(DateTime.parse(startDate))}\nBis ${_formatDate(DateTime.parse(endDate))}\n${dates.length} Termine';
+    }
+
+    List<DateBlock> getDateBlocks(List<String> dates) {
+      List<DateBlock> blocks = [];
+      DateTime? blockStart;
+      DateTime? blockEnd;
+
+      for (var date in dates) {
+        DateTime currentDate = DateTime.parse(date).toLocal();
+        if (blockStart == null) {
+          blockStart = currentDate;
+          blockEnd = currentDate;
+        } else {
+          if (currentDate.difference(blockEnd!).inDays == 1) {
+            blockEnd = currentDate;
+          } else {
+            blocks.add(DateBlock(blockStart, blockEnd));
+            blockStart = currentDate;
+            blockEnd = currentDate;
+          }
+        }
+      }
+
+      if (blockStart != null) {
+        blocks.add(DateBlock(blockStart, blockEnd!));
+      }
+
+      return blocks;
+    }
 
     return Card(
       elevation: isMultiDay ? 4 : 1,
@@ -551,16 +817,28 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
         ),
       ),
       child: ExpansionTile(
-        leading: const Icon(Icons.school, color: Colors.blueAccent),
         title: Row(
           children: [
             Expanded(
-              child: Text(
-                training['training_name'] ?? 'Unbenannte Schulung',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    training['titel'] ?? 'Unbenannte Schulung',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    formatDateRange(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
               ),
             ),
             Container(
@@ -572,7 +850,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '${maxParticipants - bookedCount}/$maxParticipants Plätze',
+                '$availableSpots/$maxParticipants Plätze',
                 style: TextStyle(
                   color: availableSpots > 0
                       ? Colors.green.shade900
@@ -583,37 +861,130 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
             ),
           ],
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              'Dozent ID: ${training['dozent_id'] ?? 'Keine Angabe'}',
-              style: const TextStyle(fontSize: 14),
-            ),
-            Text(
-              'Ort: ${training['ort'] ?? 'Kein Ort angegeben'}',
-              style: const TextStyle(fontSize: 14),
-            ),
-          ],
-        ),
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Beschreibung:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                if (training['dozent_vorname'] != null &&
+                    training['dozent_nachname'] != null) ...[
+                  Row(
+                    children: [
+                      Icon(Icons.person,
+                          size: 20,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Dozent: ${training['dozent_vorname']} ${training['dozent_nachname']}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Row(
+                  children: [
+                    Icon(Icons.location_on,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Ort: ${training['ort'] ?? 'Kein Ort angegeben'}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                Text(training['beschreibung'] ?? 'Keine Beschreibung'),
+                const SizedBox(height: 16),
+                Text(
+                  'Beschreibung',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  training['beschreibung'] ?? 'Keine Beschreibung verfügbar',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.87),
+                      ),
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Termine:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                ...dates.map((date) => Text('- $date')),
+                Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: getDateBlocks(dates.cast<String>())
+                      .map((block) => Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            child: Text(
+                              '${block.dates.length} Termine\nVon: ${_formatDate(block.startDate)}\nBis: ${_formatDate(block.endDate)}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(context).colorScheme.onSurface,
+                                height: 1.5,
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                ),
+                if (training['tags'] != null &&
+                    (training['tags'] as List).isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tags:',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 4.0,
+                    children: (training['tags'] as List)
+                        .map((tag) => Chip(
+                              label: Text(tag),
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .secondaryContainer,
+                              labelStyle: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSecondaryContainer,
+                              ),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.all(4),
+                            ))
+                        .toList(),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -639,36 +1010,18 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     );
   }
 
-  Future<void> _deleteTraining(int trainingId) async {
-    try {
-      final response = await http.delete(
-        Uri.parse('http://localhost:3001/api/trainings/$trainingId'),
-      );
-      if (response.statusCode == 200) {
-        fetchTrainings();
-        showSuccessSnackbar('Schulung gelöscht');
-      } else {
-        showErrorSnackbar('Fehler beim Löschen der Schulung');
-      }
-    } catch (e) {
-      showErrorSnackbar('Fehler: $e');
-    }
-  }
-
-  void showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
-  void showSuccessSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+  @override
+  void dispose() {
+    _tagController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    print('Building ManageTrainingsPage');
+    print('Number of trainings: ${trainings.length}');
+    print('Trainings data: $trainings');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Schulungen verwalten'),
@@ -678,6 +1031,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
           : ListView.builder(
               itemCount: trainings.length,
               itemBuilder: (context, index) {
+                print('Building training at index $index: ${trainings[index]}');
                 return buildTrainingItem(trainings[index]);
               },
             ),
@@ -686,5 +1040,19 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
         child: const Icon(Icons.add),
       ),
     );
+  }
+}
+
+class DateBlock {
+  final DateTime startDate;
+  final DateTime endDate;
+  List<DateTime> dates = [];
+
+  DateBlock(this.startDate, this.endDate) {
+    DateTime current = startDate;
+    while (!current.isAfter(endDate)) {
+      dates.add(current);
+      current = current.add(const Duration(days: 1));
+    }
   }
 }

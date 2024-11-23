@@ -23,15 +23,13 @@ class ThemeService extends ChangeNotifier {
     primarySwatch: Colors.blue,
     scaffoldBackgroundColor: Colors.white,
     cardColor: Colors.white,
-    colorScheme: ColorScheme.light(
+    colorScheme: const ColorScheme.light(
       primary: Colors.blue,
       secondary: Colors.blueAccent,
       surface: Colors.white,
-      background: Colors.grey[50]!,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
       onSurface: Colors.black87,
-      onBackground: Colors.black87,
     ),
     dividerColor: Colors.grey[300],
     textTheme: const TextTheme(
@@ -54,11 +52,9 @@ class ThemeService extends ChangeNotifier {
       primary: Colors.blue[300]!,
       secondary: Colors.blueAccent[100]!,
       surface: const Color(0xFF2D2D2D),
-      background: const Color(0xFF1E1E1E),
       onPrimary: Colors.black,
       onSecondary: Colors.black,
       onSurface: Colors.white,
-      onBackground: Colors.white,
     ),
     dividerColor: Colors.grey[800],
     textTheme: const TextTheme(

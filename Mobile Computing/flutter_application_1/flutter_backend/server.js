@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs'); // Für Passwort-Hashing
+const nodemailer = require('nodemailer'); // Added nodemailer
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -37,9 +38,121 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+// Create email transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD
+  }
+});
+
 // Test Route
 app.get('/', (req, res) => {
   res.send('Backend Server is Running');
+});
+
+// Create or get existing tag
+app.post('/api/tags', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const { name } = req.body;
+    
+    // Check if tag already exists
+    const [existingTag] = await connection.query(
+      'SELECT id FROM tags WHERE name = ?',
+      [name]
+    );
+
+    if (existingTag.length > 0) {
+      return res.status(409).json({ 
+        id: existingTag[0].id,
+        message: 'Tag already exists' 
+      });
+    }
+
+    // Create new tag
+    const [result] = await connection.query(
+      'INSERT INTO tags (name, create_time) VALUES (?, NOW())',
+      [name]
+    );
+
+    res.status(201).json({
+      id: result.insertId,
+      name: name,
+      message: 'Tag created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating tag:', error);
+    res.status(500).json({ message: 'Error creating tag', error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// Get tag by name
+app.get('/api/tags/byName/:name', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const [tag] = await connection.query(
+      'SELECT * FROM tags WHERE name = ?',
+      [req.params.name]
+    );
+
+    if (tag.length === 0) {
+      return res.status(404).json({ message: 'Tag not found' });
+    }
+
+    res.json(tag[0]);
+  } catch (error) {
+    console.error('Error fetching tag:', error);
+    res.status(500).json({ message: 'Error fetching tag', error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// Associate tags with training
+app.post('/api/training-tags', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const { trainingId, tagIds } = req.body;
+
+    // Insert all tag associations
+    const values = tagIds.map(tagId => [trainingId, tagId]);
+    await connection.query(
+      'INSERT INTO training_tags (training_id, tag_id) VALUES ?',
+      [values]
+    );
+
+    res.status(201).json({ message: 'Tags associated with training successfully' });
+  } catch (error) {
+    console.error('Error associating tags:', error);
+    res.status(500).json({ message: 'Error associating tags', error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// Get tags for a training
+app.get('/api/training/:trainingId/tags', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const [tags] = await connection.query(
+      `SELECT t.* 
+       FROM tags t
+       JOIN training_tags tt ON t.id = tt.tag_id
+       WHERE tt.training_id = ?`,
+      [req.params.trainingId]
+    );
+
+    res.json(tags);
+  } catch (error) {
+    console.error('Error fetching training tags:', error);
+    res.status(500).json({ message: 'Error fetching training tags', error: error.message });
+  } finally {
+    connection.release();
+  }
 });
 
 app.get('/api/users/:userId/bookings', async (req, res) => {
@@ -95,65 +208,67 @@ app.get('/api/users/:userId/bookings', async (req, res) => {
 app.get('/api/trainings', async (req, res) => {
   const connection = await pool.getConnection();
   try {
-    const [rows] = await connection.query(`
-      SELECT
-        s.id,
-        s.titel AS training_name,
-        s.beschreibung,
-        s.ort,
-        s.max_teilnehmer,
-        s.dozent_id,
-        d.vorname AS dozent_vorname,
-        d.nachname AS dozent_nachname,
-        d.email AS dozent_email,
-        GROUP_CONCAT(DISTINCT DATE_FORMAT(ss.datum, '%Y-%m-%d') ORDER BY ss.datum ASC) AS dates,
-        COUNT(DISTINCT b.id) AS booked_count,
-        MIN(ss.datum) as start_date,
-        MAX(ss.datum) as end_date,
-        COUNT(DISTINCT ss.datum) as session_count
-      FROM
-        schulungen s
-      LEFT JOIN
-        dozenten d ON s.dozent_id = d.id
-      LEFT JOIN
-        schulung_sessions ss ON s.id = ss.schulung_id
-      LEFT JOIN
-        bookings b ON s.id = b.training_id
-      GROUP BY
-        s.id
-      ORDER BY
-        start_date ASC
+    console.log('Fetching trainings...');
+    const [trainings] = await connection.execute(`
+      SELECT 
+        s.*,
+        d.vorname as dozent_vorname,
+        d.nachname as dozent_nachname,
+        d.email as dozent_email,
+        GROUP_CONCAT(DISTINCT t.name) as tag_names,
+        (SELECT COUNT(*) FROM bookings b WHERE b.training_id = s.id) as booked_count
+      FROM schulungen s
+      LEFT JOIN dozenten d ON s.dozent_id = d.id
+      LEFT JOIN schulungen_tags st ON s.id = st.schulung_id
+      LEFT JOIN tags t ON st.tag_id = t.id
+      GROUP BY s.id
     `);
+    
+    console.log('Raw trainings:', trainings);
 
-    // Process the dates
-    const trainings = rows.map(row => ({
-      ...row,
-      dates: row.dates ? row.dates.split(',') : [],
-      start_date: row.start_date ? row.start_date.toISOString().split('T')[0] : null,
-      end_date: row.end_date ? row.end_date.toISOString().split('T')[0] : null,
-      is_multi_day: row.session_count > 1
-    }));
+    // Get sessions for each training
+    for (let training of trainings) {
+      const [sessions] = await connection.execute(
+        'SELECT * FROM schulung_sessions WHERE schulung_id = ? ORDER BY datum',
+        [training.id]
+      );
+      
+      // Format dates for frontend
+      training.dates = sessions.map(session => session.datum);
+      training.start_date = sessions.length > 0 ? sessions[0].datum : null;
+      training.end_date = sessions.length > 0 ? sessions[sessions.length - 1].datum : null;
+      training.sessions = sessions;
+      
+      // Convert tag_names string to array
+      training.tags = training.tag_names ? training.tag_names.split(',') : [];
+      delete training.tag_names;
+      
+      // Ensure booked_count is a number
+      training.booked_count = parseInt(training.booked_count) || 0;
+      
+      console.log(`Training ${training.id} has ${training.booked_count} bookings`);
+    }
 
+    console.log('Processed trainings:', trainings);
     res.json(trainings);
   } catch (error) {
-    console.error('Error fetching trainings:', error);
-    res.status(500).json({ error: 'Error fetching trainings' });
+    console.error('Error in /api/trainings:', error);
+    res.status(500).json({ error: error.message });
   } finally {
     connection.release();
   }
 });
 
-// Create a new training
+// In your server.js
 app.post('/api/trainings', async (req, res) => {
-  const { training_name, description, location, max_participants, lecturer_id, dates, pauses } = req.body;
-
   const connection = await pool.getConnection();
-
   try {
+    const { training_name, description, location, max_participants, lecturer_id, dates, tags, pauses } = req.body;
+    
     // Beginne eine Transaktion
     await connection.beginTransaction();
 
-    // Füge die Schulung hinzu
+    // Füge die Schulung hinzu (without tags)
     const [result] = await connection.execute(
       'INSERT INTO schulungen (titel, beschreibung, ort, max_teilnehmer, dozent_id, gesamt_startdatum, gesamt_enddatum) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [training_name, description, location, max_participants, lecturer_id, dates[0], dates[dates.length - 1]]
@@ -161,6 +276,14 @@ app.post('/api/trainings', async (req, res) => {
 
     const trainingId = result.insertId;
 
+    // Insert tag relationships
+    if (tags && tags.length > 0) {
+      const tagValues = tags.map(tagId => [trainingId, tagId]);
+      await connection.query(
+        'INSERT INTO schulungen_tags (schulung_id, tag_id) VALUES ?',
+        [tagValues]
+      );
+    }
     // Füge die Trainingstage hinzu
     const sessionInserts = dates.map(date => [trainingId, date, '09:00:00', '17:00:00', 'normal', null]);
     await connection.query(
@@ -343,6 +466,7 @@ app.get('/api/trainings/search', async (req, res) => {
       FROM schulungen s
       LEFT JOIN dozenten d ON s.dozent_id = d.id
       LEFT JOIN schulung_sessions ss ON s.id = ss.schulung_id
+      LEFT JOIN tags t ON ss.tag_id = t.id
       WHERE 
         LOWER(s.titel) LIKE ? OR
         LOWER(s.beschreibung) LIKE ? OR
@@ -417,7 +541,7 @@ app.get('/api/trainings/search', async (req, res) => {
 
 // Create a new booking
 app.post('/api/bookings', async (req, res) => {
-  const { user_id, training_id } = req.body;
+  const { user_id, training_id, send_email } = req.body;
 
   if (!user_id || !training_id) {
     return res.status(400).json({ error: 'user_id und training_id sind erforderlich' });
@@ -426,7 +550,7 @@ app.post('/api/bookings', async (req, res) => {
   const connection = await pool.getConnection();
 
   try {
-    // Überprüfen, ob der Nutzer die Schulung bereits gebucht hat
+    // Check if user has already booked this training
     const [existingBooking] = await connection.query(
       'SELECT * FROM bookings WHERE user_id = ? AND training_id = ?',
       [user_id, training_id]
@@ -436,7 +560,7 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ error: 'Sie haben dieses Training bereits gebucht' });
     }
 
-    // Überprüfen, ob es noch freie Plätze gibt
+    // Check if there are available spots
     const [[{ booked_count }]] = await connection.query(
       'SELECT COUNT(*) AS booked_count FROM bookings WHERE training_id = ?',
       [training_id]
@@ -451,16 +575,154 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ error: 'Keine freien Plätze mehr verfügbar' });
     }
 
-    // Buchung einfügen
+    // Get user's email and training details only if email should be sent
+    let userEmail;
+    let training;
+
+    if (send_email) {
+      // Get user's email from the database
+      const [userRows] = await connection.query(
+        'SELECT email FROM users WHERE id = ?',
+        [user_id]
+      );
+
+      if (userRows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      userEmail = userRows[0].email;
+
+      // Get training details
+      const [trainingDetails] = await connection.query(
+        `SELECT 
+          s.*,
+          d.vorname as dozent_vorname,
+          d.nachname as dozent_nachname,
+          d.email as dozent_email
+        FROM schulungen s
+        LEFT JOIN dozenten d ON s.dozent_id = d.id
+        WHERE s.id = ?`,
+        [training_id]
+      );
+
+      if (trainingDetails.length === 0) {
+        return res.status(404).json({ error: 'Training not found' });
+      }
+
+      training = trainingDetails[0];
+    }
+
+    // Insert booking
     await connection.query(
       'INSERT INTO bookings (user_id, training_id) VALUES (?, ?)',
       [user_id, training_id]
     );
 
-    res.status(201).json({ message: 'Buchung erfolgreich' });
+    // Send confirmation email if requested
+    if (send_email && userEmail && training) {
+      // Format dates for email
+      let formattedDates = 'Keine Termine verfügbar';
+      try {
+        if (training.gesamt_startdatum && training.gesamt_enddatum) {
+          const startDate = new Date(training.gesamt_startdatum);
+          const endDate = new Date(training.gesamt_enddatum);
+          
+          const formatDate = (date) => {
+            return date.toLocaleDateString('de-DE', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            });
+          };
+
+          if (training.gesamt_startdatum === training.gesamt_enddatum) {
+            formattedDates = formatDate(startDate);
+          } else {
+            formattedDates = `${formatDate(startDate)} - ${formatDate(endDate)}`;
+          }
+
+          // Add time blocks if available
+          if (training.time_blocks) {
+            const timeBlocks = JSON.parse(training.time_blocks);
+            const formattedBlocks = timeBlocks.map(block => 
+              `${block.start} - ${block.end} Uhr`
+            ).join('<br>');
+            if (formattedBlocks) {
+              formattedDates += '<br>Zeitblöcke:<br>' + formattedBlocks;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error formatting dates:', e);
+        formattedDates = 'Termine nicht verfügbar';
+      }
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: userEmail,
+        subject: `Buchungsbestätigung: ${training.titel}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #2196F3;">Buchungsbestätigung</h1>
+            <p>Sehr geehrte/r Teilnehmer/in,</p>
+            
+            <p>vielen Dank für Ihre Buchung. Hiermit bestätigen wir Ihre Anmeldung zu folgendem Training:</p>
+            
+            <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <h2 style="color: #1976D2; margin-top: 0;">${training.titel}</h2>
+              <p><strong>Beschreibung:</strong><br>${training.beschreibung || 'Keine Beschreibung verfügbar'}</p>
+              <p><strong>Dozent:</strong> ${training.dozent_vorname || ''} ${training.dozent_nachname || 'Nicht angegeben'}</p>
+              <p><strong>Ort:</strong> ${training.ort || 'Nicht angegeben'}</p>
+              <p><strong>Termine:</strong><br>${formattedDates}</p>
+              <p><strong>Maximale Teilnehmerzahl:</strong> ${training.max_teilnehmer || 'Nicht angegeben'}</p>
+            </div>
+
+            <h3 style="color: #1976D2;">Wichtige Informationen:</h3>
+            <ul style="list-style-type: none; padding-left: 0;">
+              <li style="margin-bottom: 10px;">✓ Bitte erscheinen Sie pünktlich zu den Terminen</li>
+              ${training.dozent_email ? 
+                `<li style="margin-bottom: 10px;">✓ Bei Verhinderung informieren Sie bitte den Dozenten: ${training.dozent_email}</li>` 
+                : ''}
+              <li style="margin-bottom: 10px;">✓ Bringen Sie bei Bedarf Ihre eigenen Materialien mit</li>
+            </ul>
+
+            <p style="margin-top: 30px;">Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p>
+            
+            <p>Mit freundlichen Grüßen<br>
+            Ihr Trainings-Team</p>
+            
+            <div style="border-top: 2px solid #2196F3; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #666;">
+              <p>Dies ist eine automatisch generierte E-Mail. Bitte antworten Sie nicht auf diese E-Mail.</p>
+            </div>
+          </div>
+        `
+      };
+
+      transporter.sendMail(mailOptions, (emailError, info) => {
+        if (emailError) {
+          console.error('Error sending email:', emailError);
+          // Still return success for booking even if email fails
+          res.status(201).json({ message: 'Training booked successfully, but email notification failed' });
+          return;
+        }
+        console.log('Email sent:', info.response);
+        res.status(201).json({ message: 'Training booked successfully and notification email sent' });
+      });
+    } else {
+      // If no email should be sent, just return success
+      res.status(201).json({ message: 'Training booked successfully' });
+    }
+
   } catch (error) {
-    console.error('Fehler bei der Buchung:', error);
-    res.status(500).json({ error: 'Fehler bei der Buchung' });
+    console.error('Detailed error in booking:', {
+      message: error.message,
+      stack: error.stack,
+      sqlMessage: error.sqlMessage
+    });
+    res.status(500).json({ 
+      error: 'Error in booking process',
+      details: error.message 
+    });
   } finally {
     connection.release();
   }
@@ -616,6 +878,56 @@ app.post('/api/dozenten', async (req, res) => {
       sqlMessage: error.sqlMessage,
       sqlState: error.sqlState
     });
+  } finally {
+    connection.release();
+  }
+});
+
+// Get tags by partial name match
+app.get('/api/tags/search', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const searchTerm = req.query.q || '';
+    const [tags] = await connection.query(
+      'SELECT * FROM tags WHERE name LIKE ? LIMIT 10',
+      [`%${searchTerm}%`]
+    );
+    res.json(tags);
+  } catch (error) {
+    console.error('Error searching tags:', error);
+    res.status(500).json({ message: 'Error searching tags', error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// Get tags for a specific training
+app.get('/api/trainings/:id/tags', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const [rows] = await connection.execute(`
+      SELECT t.* 
+      FROM tags t
+      JOIN schulungen_tags st ON t.id = st.tag_id
+      WHERE st.schulung_id = ?
+    `, [req.params.id]);
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// Get all tags
+app.get('/api/tags', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const [tags] = await connection.query('SELECT * FROM tags ORDER BY name ASC');
+    res.json(tags);
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({ message: 'Error fetching tags', error: error.message });
   } finally {
     connection.release();
   }
