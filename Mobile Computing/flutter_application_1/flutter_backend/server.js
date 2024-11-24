@@ -175,25 +175,39 @@ app.get('/api/users/:userId/bookings', async (req, res) => {
         COUNT(DISTINCT b2.id) AS booked_count,
         MIN(ss.datum) as start_date,
         MAX(ss.datum) as end_date,
-        COUNT(DISTINCT ss.datum) as session_count
+        COUNT(DISTINCT ss.datum) as session_count,
+        GROUP_CONCAT(DISTINCT t.name) as tag_names
       FROM bookings b
       JOIN schulungen s ON b.training_id = s.id
       LEFT JOIN dozenten d ON s.dozent_id = d.id
       LEFT JOIN schulung_sessions ss ON s.id = ss.schulung_id
       LEFT JOIN bookings b2 ON s.id = b2.training_id
+      LEFT JOIN schulungen_tags st ON s.id = st.schulung_id
+      LEFT JOIN tags t ON st.tag_id = t.id
       WHERE b.user_id = ?
       GROUP BY b.training_id
       ORDER BY s.titel ASC`,
       [userId]
     );
 
-    // Process the dates and format
-    const userBookings = bookings.map(row => ({
-      ...row,
-      dates: row.dates ? row.dates.split(',') : [],
-      start_date: row.start_date ? row.start_date.toISOString().split('T')[0] : null,
-      end_date: row.end_date ? row.end_date.toISOString().split('T')[0] : null,
-      is_multi_day: row.session_count > 1
+    // Get sessions for each training
+    const userBookings = await Promise.all(bookings.map(async (booking) => {
+      const [sessions] = await connection.execute(
+        'SELECT * FROM schulung_sessions WHERE schulung_id = ? ORDER BY datum',
+        [booking.training_id]
+      );
+
+      return {
+        ...booking,
+        dates: booking.dates ? booking.dates.split(',') : [],
+        start_date: booking.start_date ? booking.start_date.toISOString().split('T')[0] : null,
+        end_date: booking.end_date ? booking.end_date.toISOString().split('T')[0] : null,
+        is_multi_day: booking.session_count > 1,
+        tags: booking.tag_names ? booking.tag_names.split(',') : [],
+        sessions: sessions,
+        start_times: sessions.map(s => s.startzeit),
+        end_times: sessions.map(s => s.endzeit)
+      };
     }));
 
     res.json(userBookings);
@@ -259,16 +273,15 @@ app.get('/api/trainings', async (req, res) => {
   }
 });
 
-// In your server.js
 app.post('/api/trainings', async (req, res) => {
   const connection = await pool.getConnection();
   try {
-    const { training_name, description, location, max_participants, lecturer_id, dates, tags, pauses } = req.body;
+    const { training_name, description, location, max_participants, lecturer_id, dates, tags, pauses, start_times, end_times } = req.body;
     
-    // Beginne eine Transaktion
+    // Begin a transaction
     await connection.beginTransaction();
 
-    // Füge die Schulung hinzu (without tags)
+    // Insert the training (without tags)
     const [result] = await connection.execute(
       'INSERT INTO schulungen (titel, beschreibung, ort, max_teilnehmer, dozent_id, gesamt_startdatum, gesamt_enddatum) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [training_name, description, location, max_participants, lecturer_id, dates[0], dates[dates.length - 1]]
@@ -284,14 +297,23 @@ app.post('/api/trainings', async (req, res) => {
         [tagValues]
       );
     }
-    // Füge die Trainingstage hinzu
-    const sessionInserts = dates.map(date => [trainingId, date, '09:00:00', '17:00:00', 'normal', null]);
+
+    // Insert training sessions with start and end times
+    const sessionInserts = dates.map((date, index) => [
+      trainingId, 
+      date, 
+      (start_times && start_times[index]) || '09:00:00',  // Use provided start time or default
+      (end_times && end_times[index]) || '17:00:00',    // Use provided end time or default
+      'normal', 
+      null
+    ]);
+    
     await connection.query(
       'INSERT INTO schulung_sessions (schulung_id, datum, startzeit, endzeit, typ, bemerkung) VALUES ?',
       [sessionInserts]
     );
 
-    // Füge die Pausen hinzu
+    // Insert pauses
     if (pauses && pauses.length > 0) {
       const pauseInserts = pauses.map(pause => [trainingId, pause.start, pause.end, 'Pausengrund']);
       await connection.query(
@@ -300,39 +322,89 @@ app.post('/api/trainings', async (req, res) => {
       );
     }
 
-    // Commit der Transaktion
+    // Commit the transaction
     await connection.commit();
     res.status(201).send({ message: 'Schulung hinzugefügt' });
   } catch (error) {
-    // Rollback bei Fehler
+    // Rollback on error
     await connection.rollback();
     console.error('Fehler beim Hinzufügen der Schulung:', error);
     res.status(500).send({ message: 'Fehler beim Hinzufügen der Schulung' });
   } finally {
-    // Verbindung freigeben
+    // Release the connection
     connection.release();
   }
 });
 
 // Update a training by ID
 app.put('/api/trainings/:id', async (req, res) => {
-  const { id } = req.params;
-  const { date, training_name } = req.body;
-
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
-      'UPDATE schulungen SET gesamt_startdatum = ?, titel = ? WHERE id = ?',
-      [date, training_name, id]
+    const trainingId = req.params.id;
+    const { training_name, description, location, max_participants, lecturer_id, dates, tags, pauses, start_times, end_times } = req.body;
+    
+    // Format dates for MySQL (YYYY-MM-DD format)
+    const formattedStartDate = new Date(dates[0]).toISOString().split('T')[0];
+    const formattedEndDate = new Date(dates[dates.length - 1]).toISOString().split('T')[0];
+    
+    // Begin a transaction
+    await connection.beginTransaction();
+
+    // Update the training basic info
+    await connection.execute(
+      'UPDATE schulungen SET titel = ?, beschreibung = ?, ort = ?, max_teilnehmer = ?, dozent_id = ?, gesamt_startdatum = ?, gesamt_enddatum = ? WHERE id = ?',
+      [training_name, description, location, max_participants, lecturer_id, formattedStartDate, formattedEndDate, trainingId]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Training not found' });
+    // Delete existing tag relationships
+    await connection.execute('DELETE FROM schulungen_tags WHERE schulung_id = ?', [trainingId]);
+
+    // Insert new tag relationships
+    if (tags && tags.length > 0) {
+      // First, get tag IDs from tag names
+      const tagPlaceholders = tags.map(() => '?').join(',');
+      const [tagRows] = await connection.execute(
+        `SELECT id, name FROM tags WHERE name IN (${tagPlaceholders})`,
+        tags
+      );
+      
+      if (tagRows.length > 0) {
+        const tagValues = tagRows.map(tag => [trainingId, tag.id]);
+        await connection.query(
+          'INSERT INTO schulungen_tags (schulung_id, tag_id) VALUES ?',
+          [tagValues]
+        );
+      }
     }
 
-    res.json({ message: 'Training updated' });
+    // Delete existing sessions
+    await connection.execute('DELETE FROM schulung_sessions WHERE schulung_id = ?', [trainingId]);
+
+    // Insert updated training sessions with formatted dates
+    const sessionInserts = dates.map((date, index) => [
+      trainingId, 
+      new Date(date).toISOString().split('T')[0], // Format date for MySQL
+      (start_times && start_times[index]) || '09:00:00',
+      (end_times && end_times[index]) || '17:00:00',
+      'normal', 
+      null
+    ]);
+    
+    await connection.query(
+      'INSERT INTO schulung_sessions (schulung_id, datum, startzeit, endzeit, typ, bemerkung) VALUES ?',
+      [sessionInserts]
+    );
+
+    // Commit the transaction
+    await connection.commit();
+    
+    res.json({ message: 'Training successfully updated', id: trainingId });
   } catch (error) {
+    await connection.rollback();
     console.error('Error updating training:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
   }
 });
 
@@ -466,7 +538,6 @@ app.get('/api/trainings/search', async (req, res) => {
       FROM schulungen s
       LEFT JOIN dozenten d ON s.dozent_id = d.id
       LEFT JOIN schulung_sessions ss ON s.id = ss.schulung_id
-      LEFT JOIN tags t ON ss.tag_id = t.id
       WHERE 
         LOWER(s.titel) LIKE ? OR
         LOWER(s.beschreibung) LIKE ? OR
@@ -679,7 +750,7 @@ app.post('/api/bookings', async (req, res) => {
 
             <h3 style="color: #1976D2;">Wichtige Informationen:</h3>
             <ul style="list-style-type: none; padding-left: 0;">
-              <li style="margin-bottom: 10px;">✓ Bitte erscheinen Sie pünktlich zu den Terminen</li>
+              <li style="margin-bottom: 10px;">✓ Bitte erscheinen Sie 15 Minuten früher zu den Terminen</li>
               ${training.dozent_email ? 
                 `<li style="margin-bottom: 10px;">✓ Bei Verhinderung informieren Sie bitte den Dozenten: ${training.dozent_email}</li>` 
                 : ''}

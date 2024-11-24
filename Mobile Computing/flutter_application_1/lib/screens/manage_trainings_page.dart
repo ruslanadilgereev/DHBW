@@ -12,7 +12,7 @@ class ManageTrainingsPage extends StatefulWidget {
 }
 
 class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
-  List<dynamic> trainings = [];
+  List<dynamic> _trainings = [];
   final LecturerService _lecturerService = LecturerService();
   final TagService _tagService = TagService();
   List<Lecturer> _lecturers = [];
@@ -64,10 +64,10 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
         print('Decoded JSON data: $jsonData');
 
         setState(() {
-          trainings =
+          _trainings =
               jsonData.map((json) => json as Map<String, dynamic>).toList();
         });
-        print('Updated trainings state: $trainings');
+        print('Updated trainings state: $_trainings');
       } else {
         print('Failed to fetch trainings. Status code: ${response.statusCode}');
       }
@@ -80,6 +80,9 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     String trainingName = '';
     List<DateTime> selectedDates = [];
     List<DateTimeRange> pauses = [];
+    // Add maps to store start and end times for each date
+    Map<DateTime, TimeOfDay> startTimes = {};
+    Map<DateTime, TimeOfDay> endTimes = {};
 
     // Controllers for input fields
     TextEditingController nameController = TextEditingController();
@@ -306,8 +309,9 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                         final pickedRange = await showDateRangePicker(
                           locale: const Locale("de", "DE"),
                           context: dialogContext,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2101),
+                          firstDate: DateTime.now(),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365 * 2)),
                           initialDateRange: selectedDates.isNotEmpty
                               ? DateTimeRange(
                                   start: selectedDates.first,
@@ -335,16 +339,69 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                     // Trainingsdaten anzeigen
                     const Text('Trainingstage:'),
                     const SizedBox(height: 5),
-                    Wrap(
-                      spacing: 8.0,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: selectedDates.map((date) {
-                        return Chip(
-                          label: Text(_formatDate(date)),
-                          onDeleted: () {
-                            setDialogState(() {
-                              selectedDates.remove(date);
-                            });
-                          },
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Chip(
+                                  label: Text(_formatDate(date)),
+                                  onDeleted: () {
+                                    setDialogState(() {
+                                      selectedDates.remove(date);
+                                      startTimes.remove(date);
+                                      endTimes.remove(date);
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Start time button
+                              TextButton(
+                                onPressed: () async {
+                                  final time = await showTimePicker(
+                                    context: dialogContext,
+                                    initialTime: startTimes[date] ??
+                                        const TimeOfDay(hour: 9, minute: 0),
+                                  );
+                                  if (time != null) {
+                                    setDialogState(() {
+                                      startTimes[date] = time;
+                                    });
+                                  }
+                                },
+                                child: Text(
+                                  startTimes[date]?.format(context) ?? '09:00',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const Text(' - '),
+                              // End time button
+                              TextButton(
+                                onPressed: () async {
+                                  final time = await showTimePicker(
+                                    context: dialogContext,
+                                    initialTime: endTimes[date] ??
+                                        const TimeOfDay(hour: 17, minute: 0),
+                                  );
+                                  if (time != null) {
+                                    setDialogState(() {
+                                      endTimes[date] = time;
+                                    });
+                                  }
+                                },
+                                child: Text(
+                                  endTimes[date]?.format(context) ?? '17:00',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
                         );
                       }).toList(),
                     ),
@@ -360,7 +417,8 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                               : DateTime.now(),
                           lastDate: selectedDates.isNotEmpty
                               ? selectedDates.last
-                              : DateTime(2101),
+                              : DateTime.now()
+                                  .add(const Duration(days: 365 * 2)),
                         );
                         if (pickedPause != null) {
                           setDialogState(() {
@@ -410,6 +468,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                 TextButton(
                   child: const Text('Abbrechen'),
                   onPressed: () {
+                    _tags.clear(); // This will reset the selected tags
                     Navigator.of(dialogContext).pop();
                   },
                 ),
@@ -419,6 +478,19 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                     if (trainingName.isNotEmpty &&
                         selectedDates.isNotEmpty &&
                         _selectedLecturer != null) {
+                      // Convert TimeOfDay to string format HH:mm:ss
+                      final startTimeStrings = selectedDates.map((date) {
+                        final time = startTimes[date] ??
+                            const TimeOfDay(hour: 9, minute: 0);
+                        return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00';
+                      }).toList();
+
+                      final endTimeStrings = selectedDates.map((date) {
+                        final time = endTimes[date] ??
+                            const TimeOfDay(hour: 17, minute: 0);
+                        return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00';
+                      }).toList();
+
                       await addTraining(
                         trainingName,
                         selectedDates,
@@ -427,6 +499,8 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                         locationController.text,
                         int.tryParse(maxParticipantsController.text) ?? 0,
                         _selectedLecturer?.id ?? 0,
+                        startTimeStrings, // Add start times
+                        endTimeStrings, // Add end times
                       );
                       Navigator.of(dialogContext).pop();
                     } else {
@@ -536,6 +610,10 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
   // Hilfsfunktion zum Generieren von Trainingstagen unter Berücksichtigung von Pausen
   List<DateTime> _generateTrainingDates(
       DateTime start, DateTime end, List<DateTimeRange> pauses) {
@@ -601,30 +679,36 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
     String location,
     int maxParticipants,
     int lecturerId,
+    List<String> startTimeStrings,
+    List<String> endTimeStrings,
   ) async {
     try {
+      // Format dates to ISO strings after normalizing them
+      final formattedDates = dates
+          .map((date) =>
+              _normalizeDate(date.toLocal()).toIso8601String().split('T')[0])
+          .toList();
+
       final tagIds = await _createTags(_tags);
       final response = await http.post(
         Uri.parse('http://localhost:3001/api/trainings'),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, dynamic>{
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
           'training_name': name,
           'description': description,
           'location': location,
           'max_participants': maxParticipants,
           'lecturer_id': lecturerId,
+          'dates': formattedDates,
           'tags': tagIds,
-          'dates': dates
-              .map((date) => date.toIso8601String().split('T').first)
-              .toList(),
           'pauses': pauses
               .map((pause) => {
-                    'start': pause.start.toIso8601String().split('T').first,
-                    'end': pause.end.toIso8601String().split('T').first,
+                    'start': pause.start.toIso8601String(),
+                    'end': pause.end.toIso8601String(),
                   })
               .toList(),
+          'start_times': startTimeStrings,
+          'end_times': endTimeStrings,
         }),
       );
 
@@ -646,6 +730,369 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
         SnackBar(content: Text('Fehler: $e')),
       );
     }
+  }
+
+  Future<void> _updateTraining(
+    int trainingId,
+    String name,
+    List<DateTime> dates,
+    List<DateTimeRange> pauses,
+    String description,
+    String location,
+    int maxParticipants,
+    int lecturerId,
+    List<String> startTimeStrings,
+    List<String> endTimeStrings,
+    List<String> tags,
+  ) async {
+    try {
+      // Format dates to ISO strings after normalizing them
+      final formattedDates = dates
+          .map((date) =>
+              _normalizeDate(date.toLocal()).toIso8601String().split('T')[0])
+          .toList();
+
+      final response = await http.put(
+        Uri.parse('http://localhost:3001/api/trainings/$trainingId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'training_name': name,
+          'description': description,
+          'location': location,
+          'max_participants': maxParticipants,
+          'lecturer_id': lecturerId,
+          'dates': formattedDates,
+          'tags': tags,
+          'pauses': pauses
+              .map((pause) => {
+                    'start': pause.start.toIso8601String(),
+                    'end': pause.end.toIso8601String(),
+                  })
+              .toList(),
+          'start_times': startTimeStrings,
+          'end_times': endTimeStrings,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        showSuccessSnackbar('Training wurde erfolgreich aktualisiert');
+        await fetchTrainings(); // Refresh the list
+      } else {
+        showErrorSnackbar('Fehler beim Aktualisieren des Trainings');
+      }
+    } catch (e) {
+      showErrorSnackbar('Fehler beim Aktualisieren des Trainings: $e');
+    }
+  }
+
+  Future<void> _showEditTrainingDialog(dynamic training) async {
+    final TextEditingController nameController =
+        TextEditingController(text: training['titel']);
+    final TextEditingController descriptionController =
+        TextEditingController(text: training['beschreibung']);
+    final TextEditingController locationController =
+        TextEditingController(text: training['ort']);
+    final TextEditingController maxParticipantsController =
+        TextEditingController(text: training['max_teilnehmer'].toString());
+
+    List<DateTime> selectedDates = [];
+    Map<DateTime, TimeOfDay> startTimes = {};
+    Map<DateTime, TimeOfDay> endTimes = {};
+    List<DateTimeRange> pauses = [];
+
+    // Initialize dates and times from sessions
+    if (training['sessions'] != null) {
+      for (var session in training['sessions']) {
+        final DateTime date =
+            _normalizeDate(DateTime.parse(session['datum']).toLocal());
+        selectedDates.add(date);
+
+        // Parse start time
+        final startTimeParts = session['startzeit'].toString().split(':');
+        startTimes[date] = TimeOfDay(
+          hour: int.parse(startTimeParts[0]),
+          minute: int.parse(startTimeParts[1]),
+        );
+
+        // Parse end time
+        final endTimeParts = session['endzeit'].toString().split(':');
+        endTimes[date] = TimeOfDay(
+          hour: int.parse(endTimeParts[0]),
+          minute: int.parse(endTimeParts[1]),
+        );
+      }
+    }
+
+    // Find the lecturer in _lecturers list
+    Lecturer? selectedLecturer = _lecturers.firstWhere(
+      (l) => l.id == training['dozent_id'],
+      orElse: () => _lecturers.first,
+    );
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.66,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Training bearbeiten',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(
+                              controller: nameController,
+                              decoration:
+                                  const InputDecoration(labelText: 'Name'),
+                            ),
+                            TextField(
+                              controller: descriptionController,
+                              decoration: const InputDecoration(
+                                  labelText: 'Beschreibung'),
+                              maxLines: 3,
+                            ),
+                            TextField(
+                              controller: locationController,
+                              decoration:
+                                  const InputDecoration(labelText: 'Ort'),
+                            ),
+                            TextField(
+                              controller: maxParticipantsController,
+                              decoration: const InputDecoration(
+                                  labelText: 'Maximale Teilnehmerzahl'),
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 16),
+                            // Date picker section
+                            ElevatedButton(
+                              onPressed: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: DateTime.now(),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now()
+                                      .add(const Duration(days: 365)),
+                                );
+                                if (date != null) {
+                                  setDialogState(() {
+                                    if (!selectedDates.contains(date)) {
+                                      selectedDates.add(date);
+                                      selectedDates.sort();
+                                    }
+                                  });
+                                }
+                              },
+                              child: const Text('Datum hinzufügen'),
+                            ),
+                            const SizedBox(height: 8),
+                            // Display selected dates with time pickers
+                            ...selectedDates.map((date) => Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4.0),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Chip(
+                                          label: Text(_formatDate(date)),
+                                          onDeleted: () {
+                                            setDialogState(() {
+                                              selectedDates.remove(date);
+                                              startTimes.remove(date);
+                                              endTimes.remove(date);
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      TextButton(
+                                        onPressed: () async {
+                                          final time = await showTimePicker(
+                                            context: context,
+                                            initialTime: startTimes[date] ??
+                                                const TimeOfDay(
+                                                    hour: 9, minute: 0),
+                                          );
+                                          if (time != null) {
+                                            setDialogState(() {
+                                              startTimes[date] = time;
+                                            });
+                                          }
+                                        },
+                                        child: Text(
+                                          startTimes[date]?.format(context) ??
+                                              '09:00',
+                                        ),
+                                      ),
+                                      const Text(' - '),
+                                      TextButton(
+                                        onPressed: () async {
+                                          final time = await showTimePicker(
+                                            context: context,
+                                            initialTime: endTimes[date] ??
+                                                const TimeOfDay(
+                                                    hour: 17, minute: 0),
+                                          );
+                                          if (time != null) {
+                                            setDialogState(() {
+                                              endTimes[date] = time;
+                                            });
+                                          }
+                                        },
+                                        child: Text(
+                                          endTimes[date]?.format(context) ??
+                                              '17:00',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                            const SizedBox(height: 16),
+                            // Lecturer dropdown
+                            DropdownButtonFormField<Lecturer>(
+                              decoration:
+                                  const InputDecoration(labelText: 'Dozent'),
+                              value: selectedLecturer,
+                              items: _lecturers.map((lecturer) {
+                                return DropdownMenuItem<Lecturer>(
+                                  value: lecturer,
+                                  child: Text(lecturer.fullName),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  selectedLecturer = value;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            // Tags section
+                            FutureBuilder<List<Tag>>(
+                              future: _tagService.getAllTags(),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) {
+                                  return const CircularProgressIndicator();
+                                }
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Tags:'),
+                                    Wrap(
+                                      spacing: 8.0,
+                                      runSpacing: 4.0,
+                                      children: snapshot.data!
+                                          .map((tag) => FilterChip(
+                                                selected: training['tags']
+                                                    .contains(tag.name),
+                                                label: Text(tag.name),
+                                                onSelected: (bool selected) {
+                                                  setDialogState(() {
+                                                    if (selected) {
+                                                      training['tags']
+                                                          .add(tag.name);
+                                                    } else {
+                                                      training['tags']
+                                                          .remove(tag.name);
+                                                    }
+                                                  });
+                                                },
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('Abbrechen'),
+                                ),
+                                const SizedBox(width: 16),
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    if (selectedDates.isEmpty) {
+                                      showErrorSnackbar(
+                                          'Bitte mindestens ein Datum auswählen');
+                                      return;
+                                    }
+
+                                    List<String> startTimeStrings = [];
+                                    List<String> endTimeStrings = [];
+
+                                    for (var date in selectedDates) {
+                                      final start = startTimes[date] ??
+                                          const TimeOfDay(hour: 9, minute: 0);
+                                      final end = endTimes[date] ??
+                                          const TimeOfDay(hour: 17, minute: 0);
+
+                                      startTimeStrings.add(
+                                          '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}:00');
+                                      endTimeStrings.add(
+                                          '${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}:00');
+                                    }
+
+                                    await _updateTraining(
+                                      training['id'],
+                                      nameController.text,
+                                      selectedDates,
+                                      [], // pauses
+                                      descriptionController.text,
+                                      locationController.text,
+                                      int.tryParse(
+                                              maxParticipantsController.text) ??
+                                          0,
+                                      selectedLecturer?.id ?? 0,
+                                      startTimeStrings,
+                                      endTimeStrings,
+                                      training['tags'],
+                                    );
+
+                                    if (mounted) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  },
+                                  child: const Text('Speichern'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _deleteTraining(int trainingId) async {
@@ -773,9 +1220,16 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
 
     String formatDateRange() {
       if (dates.isEmpty) return 'Keine Termine';
-      if (dates.length == 1)
-        return 'Am ${_formatDate(DateTime.parse(dates[0]))}';
-      return 'Von ${_formatDate(DateTime.parse(startDate))}\nBis ${_formatDate(DateTime.parse(endDate))}\n${dates.length} Termine';
+      if (dates.length == 1) {
+        final DateTime normalizedDate =
+            _normalizeDate(DateTime.parse(dates[0]).toLocal());
+        return 'Am ${_formatDate(normalizedDate)}';
+      }
+      final DateTime normalizedStartDate =
+          _normalizeDate(DateTime.parse(startDate).toLocal());
+      final DateTime normalizedEndDate =
+          _normalizeDate(DateTime.parse(endDate).toLocal());
+      return 'Von ${_formatDate(normalizedStartDate)}\nBis ${_formatDate(normalizedEndDate)}\n${dates.length} Termine';
     }
 
     List<DateBlock> getDateBlocks(List<String> dates) {
@@ -792,7 +1246,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
           if (currentDate.difference(blockEnd!).inDays == 1) {
             blockEnd = currentDate;
           } else {
-            blocks.add(DateBlock(blockStart, blockEnd));
+            blocks.add(DateBlock(blockStart, blockEnd!));
             blockStart = currentDate;
             blockEnd = currentDate;
           }
@@ -954,14 +1408,35 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                           ))
                       .toList(),
                 ),
-                if (training['tags'] != null &&
-                    (training['tags'] as List).isNotEmpty) ...[
+                if (training['sessions'] != null) ...[
                   const SizedBox(height: 16),
-                  Text(
+                  const Text(
+                    'Zeiten:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: (training['sessions'] as List).map((session) {
+                      final date = _formatDate(_normalizeDate(
+                          DateTime.parse(session['datum'].toString())
+                              .toLocal()));
+                      final startTime =
+                          session['startzeit'].toString().substring(0, 5);
+                      final endTime =
+                          session['endzeit'].toString().substring(0, 5);
+                      return Chip(
+                        label: Text('$date: $startTime - $endTime'),
+                      );
+                    }).toList(),
+                  ),
+                ],
+                if (training['tags'] != null) ...[
+                  const SizedBox(height: 16),
+                  const Text(
                     'Tags:',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -969,18 +1444,15 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                     runSpacing: 4.0,
                     children: (training['tags'] as List)
                         .map((tag) => Chip(
-                              label: Text(tag),
+                              label: Text(tag.toString()),
                               backgroundColor: Theme.of(context)
                                   .colorScheme
-                                  .secondaryContainer,
+                                  .primaryContainer,
                               labelStyle: TextStyle(
                                 color: Theme.of(context)
                                     .colorScheme
-                                    .onSecondaryContainer,
+                                    .onPrimaryContainer,
                               ),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              padding: const EdgeInsets.all(4),
                             ))
                         .toList(),
                   ),
@@ -990,15 +1462,19 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.people, color: Colors.blueAccent),
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _showEditTrainingDialog(training),
+                      tooltip: 'Training bearbeiten',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.people, color: Colors.blue),
                       onPressed: () => _viewBookings(training['id']),
                       tooltip: 'Buchungen anzeigen',
                     ),
-                    const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                      icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () => _deleteTraining(training['id']),
-                      tooltip: 'Schulung löschen',
+                      tooltip: 'Training löschen',
                     ),
                   ],
                 ),
@@ -1019,20 +1495,21 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
   @override
   Widget build(BuildContext context) {
     print('Building ManageTrainingsPage');
-    print('Number of trainings: ${trainings.length}');
-    print('Trainings data: $trainings');
+    print('Number of trainings: ${_trainings.length}');
+    print('Trainings data: $_trainings');
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Schulungen verwalten'),
       ),
-      body: trainings.isEmpty
+      body: _trainings.isEmpty
           ? const Center(child: Text('Keine Schulungen vorhanden'))
           : ListView.builder(
-              itemCount: trainings.length,
+              itemCount: _trainings.length,
               itemBuilder: (context, index) {
-                print('Building training at index $index: ${trainings[index]}');
-                return buildTrainingItem(trainings[index]);
+                print(
+                    'Building training at index $index: ${_trainings[index]}');
+                return buildTrainingItem(_trainings[index]);
               },
             ),
       floatingActionButton: FloatingActionButton(

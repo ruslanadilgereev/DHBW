@@ -4,19 +4,19 @@ import 'package:http/http.dart' as http;
 class Tag {
   final int id;
   final String name;
-  final DateTime createTime;
+  final DateTime? createTime;
 
   Tag({
     required this.id,
     required this.name,
-    required this.createTime,
+    this.createTime,
   });
 
   factory Tag.fromJson(Map<String, dynamic> json) {
     return Tag(
       id: json['id'],
-      name: json['name'],
-      createTime: DateTime.parse(json['create_time']),
+      name: json['name'] as String,
+      createTime: json['create_time'] != null ? DateTime.parse(json['create_time']) : null,
     );
   }
 }

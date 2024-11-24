@@ -156,6 +156,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                       .toList() ??
                   [],
               'tags': item['tags'] ?? [],
+              'sessions': item['sessions'] ?? [], // Add the full sessions data
             };
 
             print('Training info: $trainingInfo');
@@ -188,51 +189,57 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   }
 
   Future<List<Map<String, dynamic>>> _fetchUserBookings() async {
-    int userId = Provider.of<AuthService>(context, listen: false).userId;
-    final url = Uri.parse('$backendUrl/users/$userId/bookings');
-    print('Fetching bookings for user $userId from $url'); // Debug print
+    if (!mounted) return [];
     try {
-      final response = await http.get(url);
-      print('Bookings response status: ${response.statusCode}');
-      print('Bookings response body: ${response.body}');
+      final userId = _authService.userId;
+      if (userId <= 0) return [];
+
+      final response =
+          await http.get(Uri.parse('$backendUrl/users/$userId/bookings'));
+      if (!mounted) return [];
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+        final bookings = json.decode(response.body) as List<dynamic>;
+        if (!mounted) return [];
 
-        // Update the booked training IDs
         setState(() {
-          _userBookedTrainingIds = data
-              .map<int>((booking) => booking['training_id'] as int)
-              .toList();
+          _userBookedTrainingIds =
+              bookings.map<int>((b) => b['training_id'] as int).toList();
         });
 
-        // Return the full training data
-        return data.map<Map<String, dynamic>>((booking) {
-          return {
-            'id': booking['training_id'],
-            'name': booking['training_name'] ?? 'Unbenannte Schulung',
-            'description': booking['beschreibung'] ?? 'Keine Beschreibung',
-            'location': booking['ort'] ?? 'Kein Ort angegeben',
-            'maxParticipants': booking['max_teilnehmer'] ?? 0,
-            'lecturerId': booking['dozent_id'] ?? 'Keine Angabe',
-            'lecturerVorname': booking['dozent_vorname'] ?? '',
-            'lecturerNachname': booking['dozent_nachname'] ?? '',
-            'lecturerEmail': booking['dozent_email'] ?? '',
-            'bookedCount': booking['booked_count'] ?? 0,
-            'dates': booking['dates'] ?? [],
-            'is_multi_day': booking['is_multi_day'] ?? false,
-            'start_date': booking['start_date'] ?? '',
-            'end_date': booking['end_date'] ?? '',
-            'tags': booking['tags'] ?? [],
-          };
-        }).toList();
-      } else {
-        print('Error loading user bookings: ${response.statusCode}');
-        throw Exception('Failed to load user bookings');
+        return bookings
+            .map<Map<String, dynamic>>((b) => {
+                  'id': b['training_id'], // Use training_id as the main id
+                  'name': b['training_name'] ??
+                      '', // Changed from 'name' to 'training_name'
+                  'description': b['beschreibung'] ??
+                      '', // Changed from 'description' to 'beschreibung'
+                  'location':
+                      b['ort'] ?? '', // Changed from 'location' to 'ort'
+                  'maxParticipants': b['max_teilnehmer'] ??
+                      0, // Changed from 'max_participants'
+                  'bookedCount': b['booked_count'] ?? 0,
+                  'dates': b['dates'] ?? [],
+                  'is_multi_day': b['is_multi_day'] ?? false,
+                  'start_date': b['start_date'] ?? '',
+                  'end_date': b['end_date'] ?? '',
+                  'tags': b['tags'] ?? [],
+                  'lecturerVorname':
+                      b['dozent_vorname'] ?? '', // Added lecturer info
+                  'lecturerNachname': b['dozent_nachname'] ?? '',
+                  'lecturerEmail': b['dozent_email'] ?? '',
+                  'sessions': b['sessions'] ?? [], // Added sessions
+                  'start_times': b['start_times'] ?? [], // Added start times
+                  'end_times': b['end_times'] ?? [], // Added end times
+                })
+            .toList();
       }
+      return [];
     } catch (e) {
       print('Error fetching user bookings: $e');
-      throw Exception('Error: $e');
+      if (!mounted) return [];
+      setState(() => _bookingsFuture = Future.error(e));
+      return [];
     }
   }
 
@@ -1098,10 +1105,14 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     final int maxParticipants = training['maxParticipants'] ?? 0;
     final int bookedCount = training['bookedCount'] ?? 0;
     final int availableSpots = maxParticipants - bookedCount;
-    final bool isMultiDay = training['dates'].length > 1;
+    final List<String> dates = List<String>.from(training['dates'] ?? []);
+    final bool isMultiDay = dates.length > 1;
+    final List<String> startTimes =
+        List<String>.from(training['start_times'] ?? []);
+    final List<String> endTimes =
+        List<String>.from(training['end_times'] ?? []);
     final String startDate = training['start_date'] ?? '';
     final String endDate = training['end_date'] ?? '';
-    final List<String> dates = List<String>.from(training['dates'] ?? []);
     final bool isBooked = _userBookedTrainingIds.contains(training['id']);
 
     // Define consistent colors
@@ -1122,7 +1133,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       DateTime? endDate;
 
       for (var date in dates) {
-        DateTime rawDate = DateTime.parse(date).toLocal();
+        DateTime rawDate = _normalizeDate(DateTime.parse(date).toLocal());
         if (startDate == null) {
           startDate = rawDate;
           endDate = rawDate;
@@ -1146,8 +1157,15 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
 
     String formatDateRange() {
       if (dates.isEmpty) return 'Keine Termine';
-      if (dates.length == 1) return 'Am ${_formatDate(dates[0])}';
-      return 'Von ${_formatDate(startDate)}\nBis ${_formatDate(endDate)}\n${dates.length} Termine';
+      if (dates.length == 1) {
+        final date = _normalizeDate(DateTime.parse(dates[0]).toLocal());
+        return 'Am ${DateFormat('dd.MM.yyyy').format(date)}';
+      }
+      final normalizedStartDate =
+          _normalizeDate(DateTime.parse(startDate).toLocal());
+      final normalizedEndDate =
+          _normalizeDate(DateTime.parse(endDate).toLocal());
+      return 'Von ${DateFormat('dd.MM.yyyy').format(normalizedStartDate)}\nBis ${DateFormat('dd.MM.yyyy').format(normalizedEndDate)}\n${dates.length} Termine';
     }
 
     return Card(
@@ -1330,6 +1348,35 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                           ))
                       .toList(),
                 ),
+                if (training['sessions'] != null) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Zeiten:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: (training['sessions'] as List).map((session) {
+                      final date = DateFormat('dd.MM.yyyy').format(
+                          _normalizeDate(
+                              DateTime.parse(session['datum'].toString())
+                                  .toLocal()));
+                      final startTime =
+                          session['startzeit'].toString().substring(0, 5);
+                      final endTime =
+                          session['endzeit'].toString().substring(0, 5);
+                      return Chip(
+                        label: Text('$date: $startTime - $endTime'),
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        labelStyle: TextStyle(
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
                 if (training['tags'] != null &&
                     (training['tags'] as List).isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -1434,27 +1481,64 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   }
 
   Widget _buildSearchResults() {
-    if (!_isSearching) return Container();
+    if (!_isSearching) return const SizedBox();
 
-    // Sort search results alphabetically
-    _searchResults.sort((a, b) => (a['name'] ?? '')
-        .toString()
-        .toLowerCase()
-        .compareTo((b['name'] ?? '').toString().toLowerCase()));
-
-    if (_searchResults.isEmpty) {
-      return const Center(
-        child: Text('Keine Ergebnisse gefunden.'),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        return _buildTrainingCard(_searchResults[index], isSearchResult: true);
-      },
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(8.0),
+          color: Theme.of(context).colorScheme.primaryContainer,
+          child: Row(
+            children: [
+              Icon(Icons.search,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Suchergebnisse für "${_searchController.text}"',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  setState(() {
+                    _searchController.clear();
+                    _isSearching = false;
+                    _searchResults.clear();
+                  });
+                },
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ],
+          ),
+        ),
+        if (_searchResults.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: Text(
+                'Keine Ergebnisse gefunden.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _searchResults.length,
+            itemBuilder: (context, index) {
+              return _buildTrainingCard(_searchResults[index],
+                  isSearchResult: true);
+            },
+          ),
+      ],
     );
   }
 
