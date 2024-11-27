@@ -360,68 +360,66 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       },
     );
 
-    if (shouldProceed != null) {
-      int userId = Provider.of<AuthService>(context, listen: false).userId;
-      final url = Uri.parse('$backendUrl/bookings');
+    int userId = Provider.of<AuthService>(context, listen: false).userId;
+    final url = Uri.parse('$backendUrl/bookings');
 
-      try {
-        print('Booking training $trainingId for user $userId');
-        final response = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'user_id': userId,
-            'training_id': trainingId,
-            'send_email': shouldProceed, // Add email preference to request
-          }),
-        );
+    try {
+      print('Booking training $trainingId for user $userId');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user_id': userId,
+          'training_id': trainingId,
+          'send_email': shouldProceed, // Add email preference to request
+        }),
+      );
 
-        print('Booking response status: ${response.statusCode}');
-        print('Booking response body: ${response.body}');
+      print('Booking response status: ${response.statusCode}');
+      print('Booking response body: ${response.body}');
 
-        if (response.statusCode == 201) {
-          // Clear all cached data
-          setState(() {
-            _trainings.clear();
-            _userBookedTrainingIds.add(trainingId);
-            _bookingsFuture = null;
-          });
+      if (response.statusCode == 201) {
+        // Clear all cached data
+        setState(() {
+          _trainings.clear();
+          _userBookedTrainingIds.add(trainingId);
+          _bookingsFuture = null;
+        });
 
-          // Fetch fresh data
-          print('Fetching fresh data after booking...');
-          await _fetchTrainings();
-          _bookingsFuture = _fetchUserBookings();
+        // Fetch fresh data
+        print('Fetching fresh data after booking...');
+        await _fetchTrainings();
+        _bookingsFuture = _fetchUserBookings();
 
-          // Force a rebuild of the UI
-          setState(() {});
+        // Force a rebuild of the UI
+        setState(() {});
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Training "$trainingName" booked successfully'),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error booking training: ${response.body}'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error booking training: $e'),
+              content: Text('Training "$trainingName" booked successfully'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error booking training: ${response.body}'),
               backgroundColor: Colors.red,
             ),
           );
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error booking training: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -2282,131 +2280,89 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacementNamed(context, '/welcome');
-          },
-        ),
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          // Check if we're on a wider screen (web browser)
-          final isWideScreen = constraints.maxWidth > 600;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Check if we're on a wider screen (web browser)
+        final isWideScreen = constraints.maxWidth > 600;
 
-          return Padding(
-            // Doubled padding for web browsers
-            padding: EdgeInsets.symmetric(
-              horizontal: isWideScreen ? 96.0 : 0.0,
-            ),
-            child: Column(
-              children: [
-                _buildTagFilterChips(),
-                // Search Section with elevated design
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 16.0),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context).shadowColor.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+        return Padding(
+          // Doubled padding for web browsers
+          padding: EdgeInsets.symmetric(
+            horizontal: isWideScreen ? 96.0 : 0.0,
+          ),
+          child: Column(
+            children: [
+              _buildTagFilterChips(),
+              // Search Section with elevated design
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 16.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).shadowColor.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Schulungen suchen...',
+                      hintStyle: TextStyle(
+                        color: Theme.of(context).hintColor,
                       ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Schulungen suchen...',
-                        hintStyle: TextStyle(
-                          color: Theme.of(context).hintColor,
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                _searchTrainings('');
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outline,
                         ),
-                        prefixIcon: Icon(
-                          Icons.search,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: BorderSide(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.5),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: BorderSide(
                           color: Theme.of(context).colorScheme.primary,
+                          width: 2,
                         ),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _searchTrainings('');
-                                },
-                              )
-                            : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                          borderSide: BorderSide(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withOpacity(0.5),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
                       ),
-                      onChanged: (value) => _searchTrainings(value),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surface,
                     ),
+                    onChanged: (value) => _searchTrainings(value),
                   ),
                 ),
-                // Toggle Buttons with improved styling
-                Container(
-                  margin: const EdgeInsets.only(bottom: 16.0),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Theme.of(context).shadowColor.withOpacity(0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildViewButton(CalendarView.Jahr, 'Jahr',
-                              Icons.calendar_view_month),
-                          _buildViewButton(
-                              CalendarView.Monat, 'Monat', Icons.calendar_today),
-                          _buildViewButton(
-                              CalendarView.Woche, 'Woche', Icons.view_week),
-                          _buildViewButton(
-                              CalendarView.Liste, 'Liste', Icons.view_list),
-                          _buildViewButton(
-                              CalendarView.Gebucht, 'Gebucht', Icons.bookmark),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // Content area with subtle background
-                Expanded(
+              ),
+              // Toggle Buttons with improved styling
+              Container(
+                margin: const EdgeInsets.only(bottom: 16.0),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: Container(
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surface,
@@ -2419,33 +2375,65 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                         ),
                       ],
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        child: Column(
-                          children: [
-                            if (_isSearching)
-                              _buildSearchResults()
-                            else if (_currentView == CalendarView.Jahr)
-                              _buildYearView()
-                            else if (_currentView == CalendarView.Liste)
-                              _buildListView()
-                            else if (_currentView == CalendarView.Gebucht)
-                              _buildBookedTrainingsView()
-                            else
-                              _buildCalendarView(),
-                          ],
-                        ),
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildViewButton(CalendarView.Jahr, 'Jahr',
+                            Icons.calendar_view_month),
+                        _buildViewButton(
+                            CalendarView.Monat, 'Monat', Icons.calendar_today),
+                        _buildViewButton(
+                            CalendarView.Woche, 'Woche', Icons.view_week),
+                        _buildViewButton(
+                            CalendarView.Liste, 'Liste', Icons.view_list),
+                        _buildViewButton(
+                            CalendarView.Gebucht, 'Gebucht', Icons.bookmark),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Content area with subtle background
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).shadowColor.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      child: Column(
+                        children: [
+                          if (_isSearching)
+                            _buildSearchResults()
+                          else if (_currentView == CalendarView.Jahr)
+                            _buildYearView()
+                          else if (_currentView == CalendarView.Liste)
+                            _buildListView()
+                          else if (_currentView == CalendarView.Gebucht)
+                            _buildBookedTrainingsView()
+                          else
+                            _buildCalendarView(),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
-          );
-        },
-      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
