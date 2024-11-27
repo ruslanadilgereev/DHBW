@@ -318,13 +318,13 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text('Training buchen'),
+              title: const Text('Training buchen'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Möchten Sie dieses Training wirklich buchen?'),
-                  SizedBox(height: 20),
+                  const Text('Möchten Sie dieses Training wirklich buchen?'),
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       Checkbox(
@@ -335,20 +335,20 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                           });
                         },
                       ),
-                      Text('Bestätigungs-E-Mail senden'),
+                      const Text('Bestätigungs-E-Mail senden'),
                     ],
                   ),
                 ],
               ),
               actions: <Widget>[
                 TextButton(
-                  child: Text('Abbrechen'),
+                  child: const Text('Abbrechen'),
                   onPressed: () {
                     Navigator.of(context).pop(false);
                   },
                 ),
                 TextButton(
-                  child: Text('Buchen'),
+                  child: const Text('Buchen'),
                   onPressed: () {
                     Navigator.of(context).pop(sendEmail);
                   },
@@ -1636,11 +1636,11 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
               const Text('Sortieren nach: '),
               DropdownButton<SortOption>(
                 value: _currentSortOption,
-                items: [
+                items: const [
                   DropdownMenuItem(
                     value: SortOption.StartDateDesc,
                     child: Row(
-                      children: const [
+                      children: [
                         Icon(Icons.calendar_today, size: 16),
                         SizedBox(width: 8),
                         Text('Startdatum (neueste zuerst)'),
@@ -1650,7 +1650,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                   DropdownMenuItem(
                     value: SortOption.StartDateAsc,
                     child: Row(
-                      children: const [
+                      children: [
                         Icon(Icons.calendar_today, size: 16),
                         SizedBox(width: 8),
                         Text('Startdatum (älteste zuerst)'),
@@ -1660,7 +1660,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                   DropdownMenuItem(
                     value: SortOption.AlphabeticalAsc,
                     child: Row(
-                      children: const [
+                      children: [
                         Icon(Icons.sort_by_alpha, size: 16),
                         SizedBox(width: 8),
                         Text('Alphabetisch (A-Z)'),
@@ -1670,7 +1670,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                   DropdownMenuItem(
                     value: SortOption.AlphabeticalDesc,
                     child: Row(
-                      children: const [
+                      children: [
                         Icon(Icons.sort_by_alpha, size: 16),
                         SizedBox(width: 8),
                         Text('Alphabetisch (Z-A)'),
@@ -2282,89 +2282,131 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Check if we're on a wider screen (web browser)
-        final isWideScreen = constraints.maxWidth > 600;
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, '/welcome');
+          },
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Check if we're on a wider screen (web browser)
+          final isWideScreen = constraints.maxWidth > 600;
 
-        return Padding(
-          // Doubled padding for web browsers
-          padding: EdgeInsets.symmetric(
-            horizontal: isWideScreen ? 96.0 : 0.0,
-          ),
-          child: Column(
-            children: [
-              _buildTagFilterChips(),
-              // Search Section with elevated design
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 16.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).shadowColor.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Schulungen suchen...',
-                      hintStyle: TextStyle(
-                        color: Theme.of(context).hintColor,
+          return Padding(
+            // Doubled padding for web browsers
+            padding: EdgeInsets.symmetric(
+              horizontal: isWideScreen ? 96.0 : 0.0,
+            ),
+            child: Column(
+              children: [
+                _buildTagFilterChips(),
+                // Search Section with elevated design
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 16.0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).shadowColor.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                _searchTrainings('');
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outline,
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Schulungen suchen...',
+                        hintStyle: TextStyle(
+                          color: Theme.of(context).hintColor,
                         ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withOpacity(0.5),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
+                        prefixIcon: Icon(
+                          Icons.search,
                           color: Theme.of(context).colorScheme.primary,
-                          width: 2,
                         ),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _searchTrainings('');
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .outline
+                                .withOpacity(0.5),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surface,
                       ),
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.surface,
+                      onChanged: (value) => _searchTrainings(value),
                     ),
-                    onChanged: (value) => _searchTrainings(value),
                   ),
                 ),
-              ),
-              // Toggle Buttons with improved styling
-              Container(
-                margin: const EdgeInsets.only(bottom: 16.0),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+                // Toggle Buttons with improved styling
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16.0),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).shadowColor.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildViewButton(CalendarView.Jahr, 'Jahr',
+                              Icons.calendar_view_month),
+                          _buildViewButton(
+                              CalendarView.Monat, 'Monat', Icons.calendar_today),
+                          _buildViewButton(
+                              CalendarView.Woche, 'Woche', Icons.view_week),
+                          _buildViewButton(
+                              CalendarView.Liste, 'Liste', Icons.view_list),
+                          _buildViewButton(
+                              CalendarView.Gebucht, 'Gebucht', Icons.bookmark),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Content area with subtle background
+                Expanded(
                   child: Container(
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surface,
@@ -2377,65 +2419,33 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildViewButton(CalendarView.Jahr, 'Jahr',
-                            Icons.calendar_view_month),
-                        _buildViewButton(
-                            CalendarView.Monat, 'Monat', Icons.calendar_today),
-                        _buildViewButton(
-                            CalendarView.Woche, 'Woche', Icons.view_week),
-                        _buildViewButton(
-                            CalendarView.Liste, 'Liste', Icons.view_list),
-                        _buildViewButton(
-                            CalendarView.Gebucht, 'Gebucht', Icons.bookmark),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Content area with subtle background
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context).shadowColor.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      child: Column(
-                        children: [
-                          if (_isSearching)
-                            _buildSearchResults()
-                          else if (_currentView == CalendarView.Jahr)
-                            _buildYearView()
-                          else if (_currentView == CalendarView.Liste)
-                            _buildListView()
-                          else if (_currentView == CalendarView.Gebucht)
-                            _buildBookedTrainingsView()
-                          else
-                            _buildCalendarView(),
-                        ],
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        child: Column(
+                          children: [
+                            if (_isSearching)
+                              _buildSearchResults()
+                            else if (_currentView == CalendarView.Jahr)
+                              _buildYearView()
+                            else if (_currentView == CalendarView.Liste)
+                              _buildListView()
+                            else if (_currentView == CalendarView.Gebucht)
+                              _buildBookedTrainingsView()
+                            else
+                              _buildCalendarView(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

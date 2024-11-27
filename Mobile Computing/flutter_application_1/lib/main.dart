@@ -8,6 +8,7 @@ import 'services/theme_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/registration_screen.dart';
+import 'screens/welcome_screen.dart';
 import 'screens/main_wrapper.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -46,8 +47,9 @@ class TrainingCalendarApp extends StatelessWidget {
           supportedLocales: const [
             Locale('de', 'DE'), // Deutsch
           ],
-          initialRoute: '/',
+          initialRoute: '/welcome',
           routes: {
+            '/welcome': (context) => const WelcomeScreen(),
             '/': (context) => const MainWrapper(),
             '/register': (context) => const RegistrationScreen(),
             '/login': (context) => LoginScreen(),

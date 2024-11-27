@@ -2,11 +2,14 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class TrainingService {
-  static const String baseUrl = 'http://localhost:3001/api';
+  final String baseUrl = 'http://localhost:3001/api';
+  final http.Client client;
+
+  TrainingService({http.Client? client}) : client = client ?? http.Client();
 
   Future<List<Map<String, dynamic>>> searchTrainings(String query) async {
     try {
-      final response = await http.get(
+      final response = await client.get(
         Uri.parse('$baseUrl/trainings/search?query=$query'),
       );
 
@@ -41,7 +44,7 @@ class TrainingService {
   }
 
   Future<void> cancelTraining(String trainingId, String userId) async {
-    final response = await http.delete(
+    final response = await client.delete(
       Uri.parse('$baseUrl/trainings/$trainingId/cancel/$userId'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',

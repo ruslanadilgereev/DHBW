@@ -13,15 +13,18 @@ class MainWrapper extends StatelessWidget {
   AppBar buildAppBar(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final themeService = Provider.of<ThemeService>(context);
-    
+
     return AppBar(
       title: const Text('Training Calendar'),
       actions: [
         // Theme toggle button
         IconButton(
-          icon: Icon(themeService.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+          icon: Icon(
+              themeService.isDarkMode ? Icons.light_mode : Icons.dark_mode),
           onPressed: () => themeService.toggleTheme(),
-          tooltip: themeService.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+          tooltip: themeService.isDarkMode
+              ? 'Switch to Light Mode'
+              : 'Switch to Dark Mode',
         ),
         // Search button
         IconButton(

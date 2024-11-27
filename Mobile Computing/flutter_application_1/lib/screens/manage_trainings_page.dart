@@ -1246,7 +1246,7 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
           if (currentDate.difference(blockEnd!).inDays == 1) {
             blockEnd = currentDate;
           } else {
-            blocks.add(DateBlock(blockStart, blockEnd!));
+            blocks.add(DateBlock(blockStart, blockEnd));
             blockStart = currentDate;
             blockEnd = currentDate;
           }
