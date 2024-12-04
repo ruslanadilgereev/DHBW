@@ -112,16 +112,12 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
 
   Future<void> _fetchTrainings() async {
     final url = Uri.parse('$backendUrl/trainings');
-    print('Fetching trainings from $url');
 
     try {
       final response = await http.get(url);
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        print('Received ${data.length} trainings');
 
         // Create a temporary map to store the new data
         final Map<DateTime, List<Map<String, dynamic>>> newTrainings = {};
@@ -132,10 +128,6 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                 item['training_name'] ?? item['titel'] ?? 'Unbenannte Schulung';
             final trainingId = item['id'];
             final int bookedCount = item['booked_count'] ?? 0;
-
-            print('Processing training: $trainingName (ID: $trainingId)');
-            print('Booked count from backend: $bookedCount');
-            print('Dates from backend: ${item['sessions']}');
 
             final trainingInfo = {
               'id': trainingId,
@@ -159,15 +151,11 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
               'sessions': item['sessions'] ?? [], // Add the full sessions data
             };
 
-            print('Training info: $trainingInfo');
-
             if (item['sessions'] != null && item['sessions'] is List) {
               for (var session in item['sessions']) {
                 String dateString = session['datum'];
-                print('Processing date: $dateString');
                 DateTime rawDate = DateTime.parse(dateString).toLocal();
                 final trainingDate = _normalizeDate(rawDate);
-                print('Normalized date: $trainingDate');
                 newTrainings
                     .putIfAbsent(trainingDate, () => [])
                     .add(trainingInfo);
@@ -178,13 +166,12 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
           // Update the main trainings map with the new data
           _trainings.clear();
           _trainings.addAll(newTrainings);
-          print('Updated trainings map with ${_trainings.length} dates');
         });
       } else {
-        print('Error loading trainings: ${response.statusCode}');
+        // Handle error silently or show in UI if needed
       }
     } catch (e) {
-      print('Error fetching trainings: $e');
+      // Handle error silently or show in UI if needed
     }
   }
 
@@ -236,7 +223,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       }
       return [];
     } catch (e) {
-      print('Error fetching user bookings: $e');
+      // Handle error silently or show in UI if needed
       if (!mounted) return [];
       setState(() => _bookingsFuture = Future.error(e));
       return [];
@@ -247,7 +234,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     if (query.isEmpty) {
       setState(() {
         _isSearching = false;
-        _searchResults = [];
+        _searchResults.clear();
       });
       return;
     }
@@ -310,11 +297,10 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   }
 
   Future<void> _bookTraining(int trainingId, String trainingName) async {
-    // Show confirmation dialog
     bool? shouldProceed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
-        bool sendEmail = true; // Default value for the checkbox
+        bool sendEmail = true;
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
@@ -360,38 +346,32 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
       },
     );
 
+    if (shouldProceed == null) return;
+
     int userId = Provider.of<AuthService>(context, listen: false).userId;
     final url = Uri.parse('$backendUrl/bookings');
 
     try {
-      print('Booking training $trainingId for user $userId');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'user_id': userId,
           'training_id': trainingId,
-          'send_email': shouldProceed, // Add email preference to request
+          'send_email': shouldProceed,
         }),
       );
 
-      print('Booking response status: ${response.statusCode}');
-      print('Booking response body: ${response.body}');
-
       if (response.statusCode == 201) {
-        // Clear all cached data
         setState(() {
           _trainings.clear();
           _userBookedTrainingIds.add(trainingId);
           _bookingsFuture = null;
         });
 
-        // Fetch fresh data
-        print('Fetching fresh data after booking...');
         await _fetchTrainings();
         _bookingsFuture = _fetchUserBookings();
 
-        // Force a rebuild of the UI
         setState(() {});
 
         if (mounted) {
@@ -1113,12 +1093,10 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     final String endDate = training['end_date'] ?? '';
     final bool isBooked = _userBookedTrainingIds.contains(training['id']);
 
-    // Define consistent colors
     final borderColor = isMultiDay
         ? (isDark ? Colors.blue[300]! : Colors.blue)
         : (isDark ? Colors.orange[300]! : Colors.orange);
 
-    // Format lecturer info
     final String lecturerInfo = [
       training['lecturerVorname'] ?? '',
       training['lecturerNachname'] ?? '',
@@ -1168,15 +1146,16 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      elevation: isMultiDay ? 4 : 1,
+      elevation: isMultiDay ? 4 : 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: borderColor,
-          width: 2,
+          color: borderColor.withOpacity(0.6),
+          width: 1.5,
         ),
       ),
       child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         title: Row(
           children: [
             Expanded(
@@ -1185,237 +1164,393 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 17,
+                      color: isDark ? Colors.white : null,
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     formatDateRange(),
                     style: TextStyle(
                       fontSize: 14,
-                      color: theme.colorScheme.onSurface,
+                      color: isDark ? Colors.white70 : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: availableSpots > 0
-                    ? Colors.green.shade100
-                    : Colors.red.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '$availableSpots/$maxParticipants Plätze',
-                style: TextStyle(
+                    ? (isDark ? Colors.green.withOpacity(0.2) : Colors.green.shade50)
+                    : (isDark ? Colors.red.withOpacity(0.2) : Colors.red.shade50),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
                   color: availableSpots > 0
-                      ? Colors.green.shade900
-                      : Colors.red.shade900,
-                  fontWeight: FontWeight.bold,
+                      ? (isDark ? Colors.green.withOpacity(0.3) : Colors.green.shade200)
+                      : (isDark ? Colors.red.withOpacity(0.3) : Colors.red.shade200),
+                  width: 1,
                 ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    availableSpots > 0 ? Icons.event_seat : Icons.event_busy,
+                    size: 16,
+                    color: availableSpots > 0
+                        ? (isDark ? Colors.green.shade300 : Colors.green.shade700)
+                        : (isDark ? Colors.red.shade300 : Colors.red.shade700),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '$availableSpots/$maxParticipants',
+                    style: TextStyle(
+                      color: availableSpots > 0
+                          ? (isDark ? Colors.green.shade300 : Colors.green.shade700)
+                          : (isDark ? Colors.red.shade300 : Colors.red.shade700),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
         children: [
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.only(
+              left: 16.0,
+              right: 16.0,
+              bottom: 16.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Training Details Section
-                Container(
-                  padding: const EdgeInsets.all(12.0),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if (lecturerInfo.isNotEmpty) ...[
+                  Row(
                     children: [
-                      if (lecturerInfo.isNotEmpty) ...[
-                        Row(
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.person,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.person,
-                                size: 20,
-                                color: theme.colorScheme.onSurfaceVariant),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Dozent: $lecturerInfo',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
+                            Text(
+                              'Dozent',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark
+                                    ? theme.colorScheme.onSurface.withOpacity(0.7)
+                                    : theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
+                            const SizedBox(height: 2),
+                            Text(
+                              lecturerInfo,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            if (lecturerEmail.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                lecturerEmail,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                        if (lecturerEmail.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (training['description'] != null && training['description'].toString().isNotEmpty) ...[
+                  Text(
+                    'Beschreibung',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    training['description'].toString(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark 
+                          ? theme.colorScheme.onSurface.withOpacity(0.8)
+                          : theme.colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                Text(
+                  'Termine',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (dates.length > 1) ...[
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: getDateBlocks(dates).map((block) => Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.email,
-                                  size: 20,
-                                  color: theme.colorScheme.onSurfaceVariant),
+                              Icon(
+                                Icons.date_range,
+                                size: 16,
+                                color: theme.colorScheme.primary,
+                              ),
                               const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Email: $lecturerEmail',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
+                              Text(
+                                '${block.dates.length} Termine',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.primary,
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Von: ${DateFormat('dd.MM.yyyy').format(block.startDate)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Bis: ${DateFormat('dd.MM.yyyy').format(block.endDate)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
                         ],
-                      ],
-                      if (training['location'] != null) ...[
-                        if (lecturerInfo.isNotEmpty) const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(Icons.location_on,
-                                size: 20,
-                                color: theme.colorScheme.onSurfaceVariant),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Ort: ${training['location']}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
+                      ),
+                    )).toList(),
                   ),
-                ),
-                // Description Section
-                const SizedBox(height: 16),
-                Text(
-                  'Beschreibung',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  training['description'] ?? 'Keine Beschreibung verfügbar',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.87),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Termine:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Wrap(
-                  spacing: 8.0,
-                  runSpacing: 8.0,
-                  children: getDateBlocks(dates)
-                      .map((block) => Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            child: Text(
-                              '${block.dates.length} Termine\nVon: ${DateFormat('dd.MM.yyyy').format(block.startDate)}\nBis: ${DateFormat('dd.MM.yyyy').format(block.endDate)}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: theme.colorScheme.onSurface,
-                                height: 1.5,
-                              ),
-                            ),
-                          ))
-                      .toList(),
-                ),
-                if (training['sessions'] != null) ...[
                   const SizedBox(height: 16),
-                  const Text(
-                    'Zeiten:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
+                ],
+                if (training['sessions'] != null) ...[
                   Wrap(
                     spacing: 8.0,
                     runSpacing: 8.0,
                     children: (training['sessions'] as List).map((session) {
                       final date = DateFormat('dd.MM.yyyy').format(
-                          _normalizeDate(
-                              DateTime.parse(session['datum'].toString())
-                                  .toLocal()));
-                      final startTime =
-                          session['startzeit'].toString().substring(0, 5);
-                      final endTime =
-                          session['endzeit'].toString().substring(0, 5);
-                      return Chip(
-                        label: Text('$date: $startTime - $endTime'),
-                        backgroundColor: theme.colorScheme.primaryContainer,
-                        labelStyle: TextStyle(
-                          color: theme.colorScheme.onPrimaryContainer,
+                          _normalizeDate(DateTime.parse(session['datum'].toString()).toLocal()));
+                      final startTime = session['startzeit'].toString().substring(0, 5);
+                      final endTime = session['endzeit'].toString().substring(0, 5);
+                      
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceVariant.withOpacity(isDark ? 0.3 : 0.5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.event,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$date, $startTime - $endTime',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ] else if (dates.isNotEmpty) ...[
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: dates.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final date = _formatDate(entry.value);
+                      
+                      final String startTime = index < startTimes.length
+                          ? (startTimes[index].toString().length >= 5
+                              ? startTimes[index].toString().substring(0, 5)
+                              : startTimes[index].toString())
+                          : '--:--';
+                      
+                      final String endTime = index < endTimes.length
+                          ? (endTimes[index].toString().length >= 5
+                              ? endTimes[index].toString().substring(0, 5)
+                              : endTimes[index].toString())
+                          : '--:--';
+                      
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceVariant.withOpacity(isDark ? 0.3 : 0.5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.event,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$date, $startTime - $endTime',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     }).toList(),
                   ),
                 ],
-                if (training['tags'] != null &&
-                    (training['tags'] as List).isNotEmpty) ...[
+                if (training['tags'] != null && (training['tags'] as List).isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text(
-                    'Tags:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  Text(
+                    'Tags',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
-                    spacing: 8.0,
-                    runSpacing: 8.0,
-                    children: (training['tags'] as List)
-                        .map<Widget>((tag) => Chip(
-                              label: Text(tag.toString()),
-                              backgroundColor:
-                                  theme.colorScheme.secondaryContainer,
-                              labelStyle: TextStyle(
-                                color: theme.colorScheme.onSecondaryContainer,
-                              ),
-                            ))
-                        .toList(),
+                    spacing: 6.0,
+                    runSpacing: 6.0,
+                    children: (training['tags'] as List).map<Widget>((tag) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        tag.toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    )).toList(),
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     if (isBooked) ...[
-                      const Icon(Icons.check_circle, color: Colors.green),
-                      const SizedBox(width: 8),
-                      TextButton.icon(
-                        icon: const Icon(Icons.cancel, color: Colors.red),
-                        label: const Text('Stornieren'),
-                        onPressed: () => _showCancelConfirmationDialog(
-                          training['id'],
-                          name,
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: theme.colorScheme.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Gebucht',
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.cancel, size: 18),
+                            label: const Text('Stornieren'),
+                            onPressed: () => _showCancelConfirmationDialog(
+                              training['id'],
+                              name,
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: theme.colorScheme.error,
+                              side: BorderSide(color: theme.colorScheme.error),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ] else
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.add),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.add, size: 18),
                         label: const Text('Buchen'),
                         onPressed: availableSpots > 0
                             ? () => _showBookingDialog(
@@ -1423,13 +1558,17 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                                   name,
                                 )
                             : null,
-                        style: ElevatedButton.styleFrom(
+                        style: FilledButton.styleFrom(
                           backgroundColor: availableSpots > 0
                               ? theme.colorScheme.primary
-                              : Colors.grey,
-                          foregroundColor: Colors.white,
+                              : theme.colorScheme.surfaceVariant,
+                          foregroundColor: availableSpots > 0
+                              ? theme.colorScheme.onPrimary
+                              : theme.colorScheme.onSurfaceVariant,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                         ),
                       ),
                   ],
@@ -1466,10 +1605,19 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
         .compareTo((b['name'] ?? '').toString().toLowerCase()));
 
     return trainingsForSelectedDay.isEmpty
-        ? const Center(child: Text('Keine Trainings für diesen Tag.'))
+        ? const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'Keine Trainings für diesen Tag.',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          )
         : ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
             itemCount: trainingsForSelectedDay.length,
             itemBuilder: (context, index) {
               Map<String, dynamic> training = trainingsForSelectedDay[index];
@@ -1704,9 +1852,6 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     final url = Uri.parse('$backendUrl/trainings');
     try {
       final response = await http.get(url);
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map<Map<String, dynamic>>((item) {
@@ -1731,42 +1876,32 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
           };
         }).toList();
       } else {
-        print('Error loading trainings: ${response.statusCode}');
+        // Handle error silently or show in UI if needed
         throw Exception('Failed to load trainings');
       }
     } catch (e) {
-      print('Error fetching trainings: $e');
+      // Handle error silently or show in UI if needed
       throw Exception('Error: $e');
     }
   }
 
   Future<void> _fetchTags() async {
-    print('Starting to fetch tags...'); // Debug print
     try {
       final response = await http.get(Uri.parse('$backendUrl/tags'));
-      print('Tags response status: ${response.statusCode}'); // Debug print
-      print('Tags response body: ${response.body}'); // Debug print
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        print('Parsed data: $data'); // Debug print
         setState(() {
           _allTags = data.map((tag) => tag['name'] as String).toList();
           _filteredTags = List.from(_allTags);
           _showTagSuggestions = true;
-          print('Set _allTags to: $_allTags'); // Debug print
-          print('Set _filteredTags to: $_filteredTags'); // Debug print
-          print(
-              'Set _showTagSuggestions to: $_showTagSuggestions'); // Debug print
         });
       }
     } catch (e) {
-      print('Error fetching tags: $e'); // Debug print
+      // Handle error silently or show in UI if needed
     }
   }
 
   void _filterTags(String query) {
-    print('Filtering tags. Query: "$query"'); // Debug print
-    print('All tags before filter: $_allTags'); // Debug print
     setState(() {
       if (query.isEmpty) {
         _filteredTags = List.from(_allTags);
@@ -1776,8 +1911,6 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
             .toList();
       }
       _showTagSuggestions = true;
-      print('Filtered tags: $_filteredTags'); // Debug print
-      print('Show suggestions: $_showTagSuggestions'); // Debug print
     });
   }
 
@@ -1790,10 +1923,10 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
           _lecturers = List<Map<String, dynamic>>.from(data);
         });
       } else {
-        print('Error fetching lecturers: ${response.statusCode}');
+        // Handle error silently or show in UI if needed
       }
     } catch (e) {
-      print('Error fetching lecturers: $e');
+      // Handle error silently or show in UI if needed
     }
   }
 
@@ -1808,11 +1941,6 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
   }
 
   Widget _buildTagInput() {
-    print('Building tag input'); // Debug print
-    print('_showTagSuggestions: $_showTagSuggestions'); // Debug print
-    print('_allTags: $_allTags'); // Debug print
-    print('_filteredTags: $_filteredTags'); // Debug print
-
     return StatefulBuilder(
       builder: (context, setState) {
         return Column(
@@ -1830,16 +1958,16 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
               Wrap(
                 spacing: 8.0,
                 runSpacing: 4.0,
-                children: _selectedTags
-                    .map((tag) => Chip(
-                          label: Text(tag),
-                          onDeleted: () {
-                            setState(() {
-                              _selectedTags.remove(tag);
-                            });
-                          },
-                        ))
-                    .toList(),
+                children: _selectedTags.map((tag) {
+                  return Chip(
+                    label: Text(tag),
+                    onDeleted: () {
+                      setState(() {
+                        _selectedTags.remove(tag);
+                      });
+                    },
+                  );
+                }).toList(),
               ),
             ],
             TextField(
@@ -1852,7 +1980,12 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                   icon: const Icon(Icons.add),
                   onPressed: () {
                     if (_tagController.text.isNotEmpty) {
-                      _handleTagSelection(_tagController.text);
+                      setState(() {
+                        if (!_selectedTags.contains(_tagController.text)) {
+                          _selectedTags.add(_tagController.text);
+                          _tagController.clear();
+                        }
+                      });
                     }
                   },
                 ),
@@ -1867,7 +2000,11 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
               },
               onSubmitted: (value) {
                 if (value.isNotEmpty) {
-                  _handleTagSelection(value);
+                  setState(() {
+                    if (!_selectedTags.contains(value)) {
+                      _selectedTags.add(value);
+                    }
+                  });
                 }
               },
             ),
@@ -1916,7 +2053,9 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                       trailing: isSelected ? const Icon(Icons.check) : null,
                       onTap: () {
                         if (!isSelected) {
-                          _handleTagSelection(tag);
+                          setState(() {
+                            _selectedTags.add(tag);
+                          });
                         }
                       },
                     );
@@ -1949,16 +2088,13 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
     });
 
     // Fetch fresh tags
-    _fetchTags().then((_) {
-      print('Tags fetched for dialog: $_allTags'); // Debug print
-    });
+    _fetchTags().then((_) {});
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            print('Dialog rebuilding with tags: $_allTags'); // Debug print
             return AlertDialog(
               title: const Text('Neue Schulung erstellen'),
               content: SingleChildScrollView(
@@ -2055,6 +2191,18 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                             setDialogState(() {
                               _showTagSuggestions = true;
                             });
+                          },
+                          onChanged: (value) {
+                            _filterTags(value);
+                          },
+                          onSubmitted: (value) {
+                            if (value.isNotEmpty) {
+                              setDialogState(() {
+                                if (!_selectedTags.contains(value)) {
+                                  _selectedTags.add(value);
+                                }
+                              });
+                            }
                           },
                         ),
                         if (_allTags.isNotEmpty) ...[
@@ -2234,7 +2382,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                       final response = await http.post(
                         Uri.parse('$backendUrl/trainings'),
                         headers: {'Content-Type': 'application/json'},
-                        body: json.encode(training),
+                        body: jsonEncode(training),
                       );
 
                       if (response.statusCode == 201) {
@@ -2552,10 +2700,7 @@ class _TrainingCalendarPageState extends State<TrainingCalendarPage> {
                     label: const Text('Registrieren'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: theme.colorScheme.primary,
-                      side: BorderSide(
-                        color: theme.colorScheme.primary,
-                        width: 2,
-                      ),
+                      side: BorderSide(color: theme.colorScheme.primary),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
                         vertical: 12,

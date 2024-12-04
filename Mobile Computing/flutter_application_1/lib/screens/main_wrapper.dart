@@ -6,6 +6,7 @@ import '../services/theme_service.dart';
 import 'training_calendar_page.dart';
 import 'manage_trainings_page.dart';
 import 'training_search_delegate.dart';
+import 'profile_page.dart'; // Add ProfilePage import
 
 class MainWrapper extends StatelessWidget {
   const MainWrapper({super.key});
@@ -15,18 +16,25 @@ class MainWrapper extends StatelessWidget {
     final themeService = Provider.of<ThemeService>(context);
 
     return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.home),
+        onPressed: () {
+          Navigator.pushReplacementNamed(context, '/');
+        },
+        tooltip: 'Back to Home',
+      ),
       title: const Text('Training Calendar'),
       actions: [
         // Theme toggle button
         IconButton(
           icon: Icon(
-              themeService.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-          onPressed: () => themeService.toggleTheme(),
-          tooltip: themeService.isDarkMode
-              ? 'Switch to Light Mode'
-              : 'Switch to Dark Mode',
+            themeService.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+          ),
+          onPressed: () {
+            themeService.toggleTheme();
+          },
+          tooltip: 'Toggle Theme',
         ),
-        // Search button
         IconButton(
           icon: const Icon(Icons.search),
           onPressed: () {
@@ -34,23 +42,6 @@ class MainWrapper extends StatelessWidget {
               context: context,
               delegate: TrainingSearchDelegate(),
             );
-          },
-        ),
-        // Refresh button
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'Refresh',
-          onPressed: () {
-            // Refresh the current page
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Refreshing...')),
-              );
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const MainWrapper()),
-              );
-            }
           },
         ),
         if (!authService.isAuthenticated)

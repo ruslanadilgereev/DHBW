@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import '../lib/services/training_service.dart';
+import 'package:flutter_application_1/services/training_service.dart';
 import 'dart:convert';
 
 @GenerateNiceMocks([MockSpec<http.Client>()])
@@ -38,8 +38,8 @@ void main() {
         }
       ];
 
-      when(mockHttpClient.get(any))
-          .thenAnswer((_) async => http.Response(json.encode(mockResponse), 200));
+      when(mockHttpClient.get(any)).thenAnswer(
+          (_) async => http.Response(json.encode(mockResponse), 200));
 
       // Act
       final result = await trainingService.searchTrainings('Flutter');
@@ -96,8 +96,8 @@ void main() {
         }
       ];
 
-      when(mockHttpClient.get(any))
-          .thenAnswer((_) async => http.Response(json.encode(mockResponse), 200));
+      when(mockHttpClient.get(any)).thenAnswer(
+          (_) async => http.Response(json.encode(mockResponse), 200));
 
       // Act
       final result = await trainingService.searchTrainings('Flutter');
