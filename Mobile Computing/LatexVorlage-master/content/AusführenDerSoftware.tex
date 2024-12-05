@@ -1,0 +1,21 @@
+\chapter{Ausführen der Software}
+
+Um die Software ausführen zu können, müssen sowohl Flutter als auch Dart installiert sein. Zudem müssen die in der \textit{"pubspec.yaml"}-Datei angegebenen Pakete installiert werden. Dies erfolgt durch Ausführen des folgenden Befehls in der Konsole, während man sich im Projektordner befindet:
+\newline
+\begin{lstlisting}[caption={Installieren der benötigten Pakete}, label={lst:pubget}]
+    flutter pub get
+\end{lstlisting}
+
+Für die Einbindung der MariaDB-Datenbank sind möglicherweise Anpassungen in der Datei \textit{"flutter\_backend/.env"} erforderlich, um den Port und den Host korrekt zu konfigurieren.
+
+Zum Starten der App muss zunächst das Backend gestartet werden. Dies geschieht durch Ausführen des folgenden Befehls im Ordner \textit{"flutter\_backend"}:
+\newline
+\begin{lstlisting}[caption={Starten des Backends}, label={lst:backend}]
+    npm run dev
+\end{lstlisting}
+
+Um das Frontend zu starten, muss in einer weiteren Konsole der folgende Befehl ausgeführt werden, während man sich im Projektordner befindet. Dadurch wird das Frontend am richtigen Port gestartet:
+\newline
+\begin{lstlisting}[caption={Starten des Frontends}, label={lst:frontend}]
+    flutter run --web-port 3000
+\end{lstlisting}
