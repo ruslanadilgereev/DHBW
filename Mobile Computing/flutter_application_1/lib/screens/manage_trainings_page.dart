@@ -24,7 +24,6 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
   @override
   void initState() {
     super.initState();
-    print('ManageTrainingsPage initState called');
     fetchTrainings();
     _fetchLecturers();
   }
@@ -52,27 +51,22 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
   }
 
   Future<void> fetchTrainings() async {
-    print('Fetching trainings...');
     try {
       final response =
           await http.get(Uri.parse('http://localhost:3001/api/trainings'));
-      print('API Response status: ${response.statusCode}');
-      print('API Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonData = json.decode(response.body);
-        print('Decoded JSON data: $jsonData');
 
         setState(() {
           _trainings =
               jsonData.map((json) => json as Map<String, dynamic>).toList();
         });
-        print('Updated trainings state: $_trainings');
-      } else {
-        print('Failed to fetch trainings. Status code: ${response.statusCode}');
-      }
+      } else {}
     } catch (e) {
-      print('Error fetching trainings: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching trainings: $e')),
+      );
     }
   }
 
@@ -143,8 +137,6 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                             setDialogState(() {
                               _tagSuggestions = suggestions;
                             });
-                            print(
-                                'Tag suggestions updated: ${suggestions.length}'); // Debug print
                           },
                           onSubmitted: (value) {
                             if (value.isNotEmpty) {
@@ -213,8 +205,6 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                                               setDialogState(() {
                                                 if (!_tags.contains(tag.name)) {
                                                   _tags.add(tag.name);
-                                                  print(
-                                                      'Added tag: ${tag.name}'); // Debug print
                                                 }
                                               });
                                             },
@@ -504,8 +494,11 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                       );
                       Navigator.of(dialogContext).pop();
                     } else {
-                      showErrorSnackbar(
-                          'Bitte geben Sie einen Namen, mindestens ein Datum und einen Dozenten an');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text(
+                                'Bitte geben Sie einen Namen, mindestens ein Datum und einen Dozenten an')),
+                      );
                     }
                   },
                 ),
@@ -664,7 +657,9 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
           }
         }
       } catch (e) {
-        print('Error creating tag $tagName: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating tag $tagName: $e')),
+        );
       }
     }
     return tagIds;
@@ -775,13 +770,20 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
       );
 
       if (response.statusCode == 200) {
-        showSuccessSnackbar('Training wurde erfolgreich aktualisiert');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Training erfolgreich aktualisiert')),
+        );
         await fetchTrainings(); // Refresh the list
       } else {
-        showErrorSnackbar('Fehler beim Aktualisieren des Trainings');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Fehler beim Aktualisieren des Trainings')),
+        );
       }
     } catch (e) {
-      showErrorSnackbar('Fehler beim Aktualisieren des Trainings: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler beim Aktualisieren des Trainings: $e')),
+      );
     }
   }
 
@@ -1037,8 +1039,12 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
                                 ElevatedButton(
                                   onPressed: () async {
                                     if (selectedDates.isEmpty) {
-                                      showErrorSnackbar(
-                                          'Bitte mindestens ein Datum auswählen');
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Bitte mindestens ein Datum auswählen')),
+                                      );
                                       return;
                                     }
 
@@ -1101,13 +1107,21 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
         Uri.parse('http://localhost:3001/api/trainings/$trainingId'),
       );
       if (response.statusCode == 200) {
-        fetchTrainings();
-        showSuccessSnackbar('Schulung gelöscht');
+        setState(() {
+          _trainings.removeWhere((training) => training['id'] == trainingId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Schulung gelöscht')),
+        );
       } else {
-        showErrorSnackbar('Fehler beim Löschen der Schulung');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fehler beim Löschen der Schulung')),
+        );
       }
     } catch (e) {
-      showErrorSnackbar('Fehler: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler: $e')),
+      );
     }
   }
 
@@ -1187,10 +1201,14 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
           },
         );
       } else {
-        showErrorSnackbar('Fehler beim Laden der Buchungen');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fehler beim Laden der Buchungen')),
+        );
       }
     } catch (e) {
-      showErrorSnackbar('Fehler: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler: $e')),
+      );
     }
   }
 
@@ -1207,8 +1225,6 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
   }
 
   Widget buildTrainingItem(dynamic training) {
-    print('Building training item: $training'); // Debug log
-
     // Get dates from sessions instead of 'dates' field
     final List<dynamic> dates = (training['dates'] as List?) ?? [];
     final bool isMultiDay = dates.length > 1;
@@ -1494,10 +1510,6 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    print('Building ManageTrainingsPage');
-    print('Number of trainings: ${_trainings.length}');
-    print('Trainings data: $_trainings');
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Schulungen verwalten'),
@@ -1507,8 +1519,6 @@ class _ManageTrainingsPageState extends State<ManageTrainingsPage> {
           : ListView.builder(
               itemCount: _trainings.length,
               itemBuilder: (context, index) {
-                print(
-                    'Building training at index $index: ${_trainings[index]}');
                 return buildTrainingItem(_trainings[index]);
               },
             ),

@@ -1,1 +1,41 @@
 \chapter{Testing}
+
+Um die Kalender-App zu testen, wurden zwei Arten von Tests durchgeführt: Widget-Tests und Unit-Tests.
+
+\section{Unit-Test}
+
+Mithilfe eines Unit-Tests können einzelne Methoden und Funktionen überprüft werden. Im Test werden die erforderlichen 
+Eingabeparameter simuliert und die Ausgabeparameter auf ihre Korrektheit hin überprüft. Ein Unit-Test greift während der 
+Testdurchführung nicht auf die Festplatte zu. Dadurch werden weder Grafiken gerendert noch Benutzereingaben berücksichtigt.
+
+Unit-Tests dienen daher ausschließlich dazu, die Logik einzelner Methoden zu überprüfen. Sie eignen sich jedoch nicht, um die
+ Schnittstellenfunktionalität oder die Interaktion mit Benutzern zu testen.
+
+\section{Widget-Test}
+Der Widget-Test wird verwendet, um die Interaktion mit dem Benutzer und die grafische Darstellung der App zu überprüfen. In einer 
+isolierten Testumgebung werden Widgets erzeugt und getestet, ob sie korrekt gerendert wurden. Darüber hinaus wird überprüft, 
+ob Benutzereingaben korrekt verarbeitet werden und das erneute Rendering der Benutzeroberfläche ordnungsgemäß funktioniert.
+
+\section{Implementierung}
+
+Es wurden zwei Arten von Tests implementiert, um die Funktionalität der Kalender-App sicherzustellen:
+\begin{itemize}
+    \item Unit-Tests, um die Logik einzelner Methoden innerhalb von Flutter zu überprüfen.
+    \item Widget-Tests, um die Benutzerinteraktion und die korrekte grafische Darstellung der Anwendung zu validieren.
+\end{itemize}
+
+Der Code für die Testprogramme wurde in den folgenden Dateien umgesetzt: \textit{"training\_service\_test.dart"}, \textit{"training\_service\_test.mocks.dart"} und \textit{"widget\_test.dart"}.
+Bei \textit{"training\_service\_test.dart"} und der Datei \textit{"training\_service\_test.mocks.dart"} handelt es sich
+um den Unit-Test, wobei die Datei \textit{"training\_service\_test.mocks.dart"} eine Simulationsumgebung umsetzt und die andere Datei
+ den eigentlichen Test enthält.
+Durch die begrenzte Zeit wurde jeder Test jeweils für eine Methode implementiert. Mittels des Unit-Tests wurde die Funktion der
+ Trainingssuche getestet. Dabei wurden die folgenden vier Szenarien betrachtet:
+\begin{itemize}
+    \item Erfolgreiche Antworten (gültige Trainingsdaten).
+    \item Fehlerhafte Antworten (Fehlerstatus oder ungültige JSON-Daten).
+    \item Leere Antworten (keine Trainings gefunden).
+    \item Formatierung von null-Werten oder fehlenden Daten.
+\end{itemize}
+
+Beim Widget-Test wurde die ordnungsgemäße Initialisierung der \textit{ThemeService}- und \textit{AuthService}-Provider getestet. 
+Das Ergebnis des Testprotokolls befindet sich im Anhang.

@@ -10,6 +10,7 @@ import 'screens/home_screen.dart';
 import 'screens/registration_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/main_wrapper.dart';
+import 'screens/profile_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
@@ -49,10 +50,12 @@ class TrainingCalendarApp extends StatelessWidget {
           ],
           initialRoute: '/welcome',
           routes: {
+            '/': (context) => const WelcomeScreen(),
             '/welcome': (context) => const WelcomeScreen(),
-            '/': (context) => const MainWrapper(),
+            '/home': (context) => const MainWrapper(),
             '/register': (context) => const RegistrationScreen(),
             '/login': (context) => LoginScreen(),
+            '/profile': (context) => const ProfilePage(),
           },
         );
       },

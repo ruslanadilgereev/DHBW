@@ -3,5 +3,6 @@
     "dataworkspace.excludedProjects": [
         "mobilecomputing/mobilecomputing.sqlproj"
     ],
-    "cmake.ignoreCMakeListsMissing": true
+    "cmake.ignoreCMakeListsMissing": true,
+    "git.ignoreLimitWarning": true
 }

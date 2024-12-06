@@ -12,7 +12,7 @@ dotenv.config();
 
 // Definiere die CORS-Optionen
 const corsOptions = {
-  origin: 'http://localhost:3000', // Passe den Port an, auf dem deine Flutter-App läuft
+  origin: ['http://localhost:3000', 'http://localhost:3001'], // Allow both ports
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
@@ -222,7 +222,6 @@ app.get('/api/users/:userId/bookings', async (req, res) => {
 app.get('/api/trainings', async (req, res) => {
   const connection = await pool.getConnection();
   try {
-    console.log('Fetching trainings...');
     const [trainings] = await connection.execute(`
       SELECT 
         s.*,
@@ -238,7 +237,6 @@ app.get('/api/trainings', async (req, res) => {
       GROUP BY s.id
     `);
     
-    console.log('Raw trainings:', trainings);
 
     // Get sessions for each training
     for (let training of trainings) {
@@ -260,10 +258,8 @@ app.get('/api/trainings', async (req, res) => {
       // Ensure booked_count is a number
       training.booked_count = parseInt(training.booked_count) || 0;
       
-      console.log(`Training ${training.id} has ${training.booked_count} bookings`);
     }
 
-    console.log('Processed trainings:', trainings);
     res.json(trainings);
   } catch (error) {
     console.error('Error in /api/trainings:', error);
@@ -776,7 +772,6 @@ app.post('/api/bookings', async (req, res) => {
           res.status(201).json({ message: 'Training booked successfully, but email notification failed' });
           return;
         }
-        console.log('Email sent:', info.response);
         res.status(201).json({ message: 'Training booked successfully and notification email sent' });
       });
     } else {
@@ -825,7 +820,6 @@ app.delete('/api/bookings', async (req, res) => {
       [user_id, training_id]
     );
 
-    console.log('Booking deleted:', { user_id, training_id, affectedRows: result.affectedRows });
 
     res.json({ 
       message: 'Buchung erfolgreich storniert',
@@ -898,7 +892,6 @@ app.post('/api/dozenten', async (req, res) => {
   const connection = await pool.getConnection();
   
   try {
-    console.log('Creating new dozent:', { vorname, nachname, email });
 
     // First, check if the table exists
     const [tables] = await connection.query(
@@ -907,7 +900,6 @@ app.post('/api/dozenten', async (req, res) => {
     );
     
     if (tables.length === 0) {
-      console.log('Creating dozenten table');
       await connection.query(`
         CREATE TABLE IF NOT EXISTS dozenten (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -923,14 +915,12 @@ app.post('/api/dozenten', async (req, res) => {
       [vorname, nachname, email]
     );
     
-    console.log('Insert result:', result);
     
     const [newDozent] = await connection.query(
       'SELECT * FROM dozenten WHERE id = ?',
       [result.insertId]
     );
     
-    console.log('New dozent:', newDozent[0]);
     res.status(201).json(newDozent[0]);
   } catch (error) {
     console.error('Detailed error creating lecturer:', error);
@@ -999,6 +989,102 @@ app.get('/api/tags', async (req, res) => {
   } catch (error) {
     console.error('Error fetching tags:', error);
     res.status(500).json({ message: 'Error fetching tags', error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// Profile endpoints
+app.get('/api/profile/:userId', async (req, res) => {
+  console.log('GET /api/profile - Request received for user:', req.params.userId);
+  const connection = await pool.getConnection();
+  try {
+    console.log('Executing query to fetch profile...');
+    const [rows] = await connection.execute(
+      'SELECT email, first_name, last_name, company, phone FROM users WHERE id = ?',
+      [req.params.userId]
+    );
+    
+    console.log('Query result:', rows);
+    
+    if (rows.length === 0) {
+      console.log('No user found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log('Sending response:', rows[0]);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error in /api/profile:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  } finally {
+    connection.release();
+    console.log('Connection released');
+  }
+});
+
+app.put('/api/profile/:userId', async (req, res) => {
+  const { first_name, last_name, email, company, phone } = req.body;
+  const userId = req.params.userId;
+  const connection = await pool.getConnection();
+  
+  try {
+    const [result] = await connection.execute(
+      'UPDATE users SET first_name = ?, last_name = ?, email = ?, company = ?, phone = ? WHERE id = ?',
+      [first_name, last_name, email, company, phone, userId]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const [updatedUser] = await connection.execute(
+      'SELECT email, first_name, last_name, company, phone FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    res.json(updatedUser[0]);
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    connection.release();
+  }
+});
+
+app.post('/api/change-password', async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const connection = await pool.getConnection();
+  
+  try {
+    // First verify current password
+    const [userRows] = await connection.execute(
+      'SELECT password FROM users WHERE id = ?',
+      [1] // TODO: Replace with actual user ID from session
+    );
+    
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const currentPasswordHash = userRows[0].password;
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentPasswordHash);
+    
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+    
+    // Hash new password and update
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await connection.execute(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashedPassword, 1] // TODO: Replace with actual user ID from session
+    );
+    
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('Error changing password:', err);
+    res.status(500).json({ error: 'Internal server error' });
   } finally {
     connection.release();
   }
